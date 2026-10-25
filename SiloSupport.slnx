@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.build.props" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Presentation/" />
+  <Folder Name="/src/Presentation/Services/">
+    <Project Path="SiloSupport.Service.CustomerChat/SiloSupport.Service.CustomerChat.csproj" />
+  </Folder>
+</Solution>

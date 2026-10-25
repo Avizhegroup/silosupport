@@ -1,0 +1,37 @@
+<Project>
+
+  <PropertyGroup Condition="!'$(TargetFramework.Contains(`netstandard`))' OR !'$(TargetFramework.Contains(`net7`))'">
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Authors>Avizhe Group</Authors>
+    <Company>Avizhe Group</Company>
+    <Description>WMS system using RFID.</Description>
+    <Product>Silo</Product>
+    <Copyright>Avizhe Group</Copyright>
+    <AspNetCoreVersion>9.0.10</AspNetCoreVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Data" />
+    <Using Include="System.Collections" />
+    <Using Include="System.Threading.Tasks" />
+    <Using Include="System.Collections.Generic" />
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == '' Or '$(Configuration)' == 'Debug'">
+    <EnvironmentName>Development</EnvironmentName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' != '' AND '$(Configuration)' != 'Debug' ">
+    <EnvironmentName>Production</EnvironmentName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <WarningsAsErrors>RZ2012</WarningsAsErrors>
+  </PropertyGroup>
+</Project>
