@@ -1,2 +1,2 @@
-﻿global using Silo.Application;
-global using Silo.Infrastructure.Shared;
+﻿global using SiloSupport.Application;
+global using SiloSupport.Infrastructure.Shared;

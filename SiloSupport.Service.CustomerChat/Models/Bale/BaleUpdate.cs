@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Silo.Bot.Support.Models.Bale;
+namespace SiloSupport.Service.CustomerChat.Models.Bale;
 
 /// <summary>A single update received from the Bale Bot API via getUpdates.</summary>
 public class BaleUpdate

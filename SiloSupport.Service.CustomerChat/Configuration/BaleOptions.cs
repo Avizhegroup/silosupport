@@ -1,4 +1,4 @@
-namespace Silo.Bot.Support.Configuration;
+namespace SiloSupport.Service.CustomerChat.Configuration;
 
 /// <summary>Configuration options for the Bale Bot API.</summary>
 public class BaleOptions

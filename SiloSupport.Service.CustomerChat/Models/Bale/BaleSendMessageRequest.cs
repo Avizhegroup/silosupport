@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Silo.Bot.Support.Models.Bale;
+namespace SiloSupport.Service.CustomerChat.Models.Bale;
 
 /// <summary>Request body for the sendMessage Bale API call.</summary>
 public class BaleSendMessageRequest

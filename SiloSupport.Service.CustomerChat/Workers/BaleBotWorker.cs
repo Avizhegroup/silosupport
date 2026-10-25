@@ -1,10 +1,13 @@
 ﻿using System.Collections.Concurrent;
 using Microsoft.Extensions.Options;
-using Silo.Bot.Support.Configuration;
-using Silo.Bot.Support.Models.Bale;
-using Silo.Bot.Support.Services;
+using SiloSupport.Service.CustomerChat.Configuration;
+using SiloSupport.Service.CustomerChat.Models.Bale;
+using SiloSupport.Service.CustomerChat.Services;
+using SiloSupport.Service.CustomerChat.Configuration;
+using SiloSupport.Service.CustomerChat.Models.Bale;
+using SiloSupport.Service.CustomerChat.Services;
 
-namespace Silo.Bot.Support.Workers;
+namespace SiloSupport.Service.CustomerChat.Workers;
 
 /// <summary>
 /// Long-polls the Bale Bot API for updates, forwards each user text message to the

@@ -14,8 +14,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Silo.Application\Silo.Application.Shared.csproj" />
-        <ProjectReference Include="..\Silo.Infrastructure.Shared\Silo.Infrastructure.Shared.csproj" />
-        <ProjectReference Include="..\Silo.Shared\Silo.Shared.csproj" />
+      <ProjectReference Include="..\SiloSupport.Application\SiloSupport.Application.csproj" />
+      <ProjectReference Include="..\SiloSupport.Infrastructure\SiloSupport.Infrastructure.csproj" />
     </ItemGroup>
+
 </Project>

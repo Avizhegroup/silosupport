@@ -1,14 +1,13 @@
-﻿using Silo.Bot.Support.Configuration;
-using Silo.Bot.Support.Services;
-using Silo.Bot.Support.Workers;
+﻿using SiloSupport.Application;
+using SiloSupport.Service.CustomerChat.Configuration;
+using SiloSupport.Service.CustomerChat.Services;
+using SiloSupport.Service.CustomerChat.Workers;
 
-namespace Silo.Bot.Support;
+namespace SiloSupport.Service.CustomerChat;
 public static partial class Program
 {
     public static void AddSiloSupportBotServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSiloSerilogForWindowsServices(configuration);
-
         services.AddOptions<BaleOptions>()
             .Bind(configuration.GetSection(BaleOptions.SectionName));
 

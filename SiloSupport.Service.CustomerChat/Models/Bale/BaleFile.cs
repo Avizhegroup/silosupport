@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Silo.Bot.Support.Models.Bale;
+namespace SiloSupport.Service.CustomerChat.Models.Bale;
 
 /// <summary>Result of the Bale getFile method.</summary>
 public class BaleFile

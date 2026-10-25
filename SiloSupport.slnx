@@ -1,9 +1,14 @@
 <Solution>
   <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
     <File Path="Directory.build.props" />
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/src/" />
+  <Folder Name="/src/Core/">
+    <Project Path="SiloSupport.Application/SiloSupport.Application.csproj" />
+    <Project Path="SiloSupport.Infrastructure/SiloSupport.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Presentation/" />
   <Folder Name="/src/Presentation/Services/">
     <Project Path="SiloSupport.Service.CustomerChat/SiloSupport.Service.CustomerChat.csproj" />

@@ -1,9 +1,9 @@
 ﻿using System.Text.Json;
 using Microsoft.Extensions.Options;
-using Silo.Bot.Support.Configuration;
-using Silo.Bot.Support.Models.Bale;
+using SiloSupport.Service.CustomerChat.Configuration;
+using SiloSupport.Service.CustomerChat.Models.Bale;
 
-namespace Silo.Bot.Support.Services;
+namespace SiloSupport.Service.CustomerChat.Services;
 
 /// <summary>Thin wrapper over the Bale Bot HTTP API using a named HttpClient ("BaleClient").</summary>
 public class BaleBotClient 

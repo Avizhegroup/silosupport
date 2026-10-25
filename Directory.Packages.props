@@ -8,6 +8,8 @@
 	<ItemGroup>
 		<PackageVersion Include="BuildBundlerMinifier2022" Version="2.9.11" />
 		<PackageVersion Include="BuildWebCompiler2022" Version="1.14.15" />
+		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.10" />
+		<PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.10" />
 		<PackageVersion Include="System.Text.Json" Version="10.0.3" />
 		<PackageVersion Include="Telerik.UI.for.Blazor" Version="9.0.0" />
 		<PackageVersion Include="Serilog" Version="4.3.0" />
@@ -20,7 +22,7 @@
 		<PackageVersion Include="Serilog.Sinks.Seq" Version="9.0.0" />
 		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="$(AspNetCoreVersion)" />
-		<PackageVersion Include="Microsoft.Extensions.Http" Version="$(AspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.Extensions.Http" Version="9.0.10" />
 		<PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="$(AspNetCoreVersion)" />
@@ -28,5 +30,6 @@
 		<PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Concentus" Version="2.2.2" />
 		<PackageVersion Include="Concentus.OggFile" Version="1.0.6" />
+    <PackageVersion Include="MediatR" Version="13.1.0" />
 	</ItemGroup>
 </Project>

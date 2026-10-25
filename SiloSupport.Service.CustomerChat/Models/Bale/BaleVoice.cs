@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Silo.Bot.Support.Models.Bale;
+namespace SiloSupport.Service.CustomerChat.Models.Bale;
 
 /// <summary>A voice message attached to a Bale message.</summary>
 public class BaleVoice

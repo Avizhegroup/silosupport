@@ -1,7 +1,7 @@
 ﻿using Concentus;
 using Concentus.Oggfile;
 
-namespace Silo.Bot.Support.Services;
+namespace SiloSupport.Service.CustomerChat.Services;
 
 /// <summary>Converts Ogg/Opus voice notes (Bale format) to 16-bit PCM WAV, which the AI core accepts.</summary>
 public static class OggOpusConverter

@@ -1,6 +1,6 @@
 ﻿using Serilog;
 
-namespace Silo.Bot.Support;
+namespace SiloSupport.Service.CustomerChat;
 public static partial class Program
 {
     static void Main(string[] args)
