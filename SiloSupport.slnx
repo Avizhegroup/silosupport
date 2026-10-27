@@ -4,6 +4,9 @@
     <File Path="Directory.build.props" />
     <File Path="Directory.Packages.props" />
   </Folder>
+  <Folder Name="/Solution Items/Docs/">
+    <File Path="Docs/bale-docs.md" />
+  </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/Core/">
     <Project Path="SiloSupport.Application/SiloSupport.Application.csproj" />
