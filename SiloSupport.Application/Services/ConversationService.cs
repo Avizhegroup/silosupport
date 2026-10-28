@@ -58,6 +58,6 @@ public class ConversationService
     public async Task<OperationResult> SetResolvedAsync(int customerId, int messageId, bool isResolved, CancellationToken cancellationToken = default)
     {
         var updated = await _messages.SetResolvedAsync(customerId, messageId, isResolved, cancellationToken);
-        return updated ? OperationResult.Success() : OperationResult.Failure("The message was not found for this customer.");
+        return updated ? OperationResult.Success() : OperationResult.Failure("پیام برای این مشتری یافت نشد.");
     }
 }

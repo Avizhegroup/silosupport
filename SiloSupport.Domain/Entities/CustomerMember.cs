@@ -12,10 +12,10 @@ public class CustomerMember
     public string PhoneNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// The member's Bale user id. Bale ids can exceed 32 bits (up to 52 significant bits per the
-    /// Bale documentation), so a 64-bit integer is used.
+    /// The member's Bale user id, stored as text (trimmed). The numeric sender id of an incoming Bale message is
+    /// compared with it as its invariant decimal string.
     /// </summary>
-    public long BaleId { get; set; }
+    public string BaleId { get; set; } = string.Empty;
 
     public int CustomerId { get; set; }
 

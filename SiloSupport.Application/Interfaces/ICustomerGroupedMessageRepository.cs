@@ -13,6 +13,12 @@ public interface ICustomerGroupedMessageRepository
     /// </summary>
     Task<IReadOnlyList<GroupedMessageDto>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default);
 
+    /// <summary>All-time message counts per customer, priority and resolution state (aggregated in the database).</summary>
+    Task<IReadOnlyList<MessageCountRow>> GetCountsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Creation time and priority of every message created at or after <paramref name="sinceUtc"/>.</summary>
+    Task<IReadOnlyList<MessageTimeRow>> GetSinceAsync(DateTime sinceUtc, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Sets the resolution flag of a message that belongs to the given customer.
     /// Returns false when no such message exists for that customer.

@@ -4,56 +4,56 @@
 @inject CustomerMemberService Members
 @inject CustomerGroupService Groups
 
-<PageTitle>@(_details?.Customer.Name ?? "Customer")</PageTitle>
+<PageTitle>@(_details?.Customer.Name ?? "مشتری")</PageTitle>
 
 @if (_loaded && _details is null)
 {
-    <div class="banner banner-error">The customer does not exist.</div>
-    <LinkButton Href="/admin/customers">Back to customers</LinkButton>
+    <div class="banner banner-error">مشتری وجود ندارد.</div>
+    <LinkButton Href="/admin/customers">بازگشت به مشتریان</LinkButton>
 }
 else if (_details is null)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">در حال بارگذاری…</p>
 }
 else
 {
     <div class="page-header">
         <h1>@_details.Customer.Name</h1>
         <div class="page-actions">
-            <LinkButton Href="@($"/admin/conversations/{Id}")">Conversations</LinkButton>
-            <LinkButton Href="@($"/admin/customers/{Id}/edit")">Edit</LinkButton>
-            <LinkButton Href="/admin/customers">Back</LinkButton>
+            <LinkButton Href="@($"/admin/conversations/{Id}")">گفتگوها</LinkButton>
+            <LinkButton Href="@($"/admin/customers/{Id}/edit")">ویرایش</LinkButton>
+            <LinkButton Href="/admin/customers">بازگشت</LinkButton>
         </div>
     </div>
-    <p class="muted">@(string.IsNullOrWhiteSpace(_details.Customer.Description) ? "No description." : _details.Customer.Description)</p>
+    <p class="muted">@(string.IsNullOrWhiteSpace(_details.Customer.Description) ? "بدون توضیحات." : _details.Customer.Description)</p>
 
     <StatusBanner Message="@_message" IsError="_isError" />
     <MissingPriorityAlert Missing="_details.MissingPriorities" />
 
     <div class="panel">
         <div class="panel-head">
-            <h2>Members of @_details.Customer.Name</h2>
-            <LinkButton Href="@($"/admin/customers/{Id}/members/new")" Primary="true">Add member</LinkButton>
+            <h2>اعضای @_details.Customer.Name</h2>
+            <LinkButton Href="@($"/admin/customers/{Id}/members/new")" Primary="true">افزودن عضو</LinkButton>
         </div>
 
         @if (_details.Members.Count == 0)
         {
-            <div class="banner banner-info">This customer has no members. Messages from unregistered senders are ignored.</div>
+            <div class="banner banner-info">این مشتری عضوی ندارد. پیام فرستنده‌های ثبت‌نشده نادیده گرفته می‌شود.</div>
         }
         else
         {
             <TelerikGrid Data="_details.Members" TItem="MemberDto" Sortable="true">
                 <GridColumns>
-                    <GridColumn Field="@nameof(MemberDto.Name)" Title="Name" />
-                    <GridColumn Field="@nameof(MemberDto.PhoneNumber)" Title="Phone" />
-                    <GridColumn Field="@nameof(MemberDto.BaleId)" Title="Bale ID" />
-                    <GridColumn Field="@nameof(MemberDto.Description)" Title="Description" />
-                    <GridColumn Title="Actions" Width="200px" Sortable="false">
+                    <GridColumn Field="@nameof(MemberDto.Name)" Title="نام" />
+                    <GridColumn Field="@nameof(MemberDto.PhoneNumber)" Title="تلفن" />
+                    <GridColumn Field="@nameof(MemberDto.BaleId)" Title="شناسه بله" />
+                    <GridColumn Field="@nameof(MemberDto.Description)" Title="توضیحات" />
+                    <GridColumn Title="عملیات" Width="220px" Sortable="false">
                         <Template>
                             @{ var m = (MemberDto)context; }
                             <div class="row-actions">
-                                <LinkButton Href="@($"/admin/customers/{Id}/members/{m.Id}/edit")">Edit</LinkButton>
-                                <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => DeleteMemberAsync(m))">Delete</TelerikButton>
+                                <LinkButton Href="@($"/admin/customers/{Id}/members/{m.Id}/edit")">ویرایش</LinkButton>
+                                <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => AskDeleteMember(m))">حذف</TelerikButton>
                             </div>
                         </Template>
                     </GridColumn>
@@ -63,18 +63,18 @@ else
     </div>
 
     <div class="panel">
-        <h2>Destination priority groups</h2>
-        <p class="muted">One Bale group per priority. Classified messages are forwarded to the group of their priority.</p>
+        <h2>گروه‌های مقصد بر اساس اولویت</h2>
+        <p class="muted">برای هر اولویت یک گروه بله تعریف می‌شود. پیام‌های طبقه‌بندی‌شده به گروه اولویت خود ارسال می‌شوند.</p>
 
         <TelerikGrid Data="_details.PriorityGroups" TItem="PriorityGroupStatusDto">
             <GridColumns>
-                <GridColumn Title="Priority" Width="140px">
+                <GridColumn Title="اولویت" Width="140px">
                     <Template>
                         @{ var s = (PriorityGroupStatusDto)context; }
                         <PriorityChip Priority="s.Priority" />
                     </Template>
                 </GridColumn>
-                <GridColumn Title="Group name">
+                <GridColumn Title="نام گروه">
                     <Template>
                         @{ var s = (PriorityGroupStatusDto)context; }
                         @if (s.Group is not null)
@@ -83,29 +83,29 @@ else
                         }
                         else
                         {
-                            <span class="chip chip-warn">Not configured</span>
+                            <span class="chip chip-warn">تنظیم نشده</span>
                         }
                     </Template>
                 </GridColumn>
-                <GridColumn Title="Bale group ID">
+                <GridColumn Title="شناسه گروه بله">
                     <Template>
                         @{ var s = (PriorityGroupStatusDto)context; }
                         @(s.Group?.BaleId.ToString() ?? "")
                     </Template>
                 </GridColumn>
-                <GridColumn Title="Actions" Width="200px">
+                <GridColumn Title="عملیات" Width="220px">
                     <Template>
                         @{ var s = (PriorityGroupStatusDto)context; }
                         <div class="row-actions">
                             @if (s.Group is not null)
                             {
                                 var g = s.Group;
-                                <LinkButton Href="@($"/admin/customers/{Id}/groups/{g.Id}/edit")">Edit</LinkButton>
-                                <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => DeleteGroupAsync(g))">Delete</TelerikButton>
+                                <LinkButton Href="@($"/admin/customers/{Id}/groups/{g.Id}/edit")">ویرایش</LinkButton>
+                                <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => AskDeleteGroup(g))">حذف</TelerikButton>
                             }
                             else
                             {
-                                <LinkButton Href="@($"/admin/customers/{Id}/groups/new?priority={s.Priority}")" Primary="true">Configure</LinkButton>
+                                <LinkButton Href="@($"/admin/customers/{Id}/groups/new?priority={s.Priority}")" Primary="true">تنظیم</LinkButton>
                             }
                         </div>
                     </Template>
@@ -115,13 +115,29 @@ else
     </div>
 }
 
-@code {
-    [CascadingParameter] public DialogFactory Dialogs { get; set; } = default!;
+<ConfirmDialog Visible="_memberToDelete is not null"
+               Title="حذف عضو"
+               Message="@($"عضو «{_memberToDelete?.Name}» حذف شود؟")"
+               OnConfirm="DeleteMemberAsync"
+               OnCancel="CancelDelete" />
 
+<ConfirmDialog Visible="_groupToDelete is not null"
+               Title="حذف گروه اولویت"
+               Message="@GroupDeleteMessage"
+               OnConfirm="DeleteGroupAsync"
+               OnCancel="CancelDelete" />
+
+@code {
     [Parameter] public int Id { get; set; }
 
     private CustomerDetailsDto? _details;
+    private MemberDto? _memberToDelete;
+    private GroupDto? _groupToDelete;
     private bool _loaded;
+
+    private string GroupDeleteMessage => _groupToDelete is null
+        ? string.Empty
+        : $"گروه «{_groupToDelete.Name}» با اولویت «{PriorityHelper.DisplayName(_groupToDelete.Priority)}» حذف شود؟";
     private string? _message;
     private bool _isError;
 
@@ -133,25 +149,39 @@ else
         _loaded = true;
     }
 
-    private async Task DeleteMemberAsync(MemberDto member)
+    private void AskDeleteMember(MemberDto member) => _memberToDelete = member;
+
+    private void AskDeleteGroup(GroupDto group) => _groupToDelete = group;
+
+    private void CancelDelete()
     {
-        if (!await Dialogs.ConfirmAsync($"Delete member '{member.Name}'?", "Delete member"))
+        _memberToDelete = null;
+        _groupToDelete = null;
+    }
+
+    private async Task DeleteMemberAsync()
+    {
+        var member = _memberToDelete;
+        _memberToDelete = null;
+        if (member is null)
             return;
 
         var result = await Members.DeleteAsync(member.Id);
         _isError = !result.Succeeded;
-        _message = result.Succeeded ? "Member deleted." : result.FirstError ?? "The member could not be deleted.";
+        _message = result.Succeeded ? "عضو حذف شد." : result.FirstError ?? "حذف عضو انجام نشد.";
         await LoadAsync();
     }
 
-    private async Task DeleteGroupAsync(GroupDto group)
+    private async Task DeleteGroupAsync()
     {
-        if (!await Dialogs.ConfirmAsync($"Delete the {group.Priority} group '{group.Name}'?", "Delete priority group"))
+        var group = _groupToDelete;
+        _groupToDelete = null;
+        if (group is null)
             return;
 
         var result = await Groups.DeleteAsync(group.Id);
         _isError = !result.Succeeded;
-        _message = result.Succeeded ? "Group deleted." : result.FirstError ?? "The group could not be deleted.";
+        _message = result.Succeeded ? "گروه حذف شد." : result.FirstError ?? "حذف گروه انجام نشد.";
         await LoadAsync();
     }
 }

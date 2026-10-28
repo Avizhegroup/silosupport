@@ -1,0 +1,27 @@
+<TelerikDialog Visible="@Visible" Title="@Title" Width="420px" ShowCloseButton="false">
+    <DialogContent>
+        <p class="confirm-text">@Message</p>
+    </DialogContent>
+    <DialogButtons>
+        <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="Confirm">@ConfirmText</TelerikButton>
+        <TelerikButton FillMode="@ThemeConstants.Button.FillMode.Outline" OnClick="Cancel">انصراف</TelerikButton>
+    </DialogButtons>
+</TelerikDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+
+    [Parameter] public string Title { get; set; } = "تأیید";
+
+    [Parameter] public string Message { get; set; } = string.Empty;
+
+    [Parameter] public string ConfirmText { get; set; } = "حذف";
+
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private Task Confirm() => OnConfirm.InvokeAsync();
+
+    private Task Cancel() => OnCancel.InvokeAsync();
+}

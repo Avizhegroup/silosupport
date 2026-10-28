@@ -35,10 +35,10 @@ public class CustomerMemberService
             return OperationResult<int>.Failure(errors);
 
         if (await _customers.GetByIdAsync(customerId, cancellationToken) is null)
-            return OperationResult<int>.Failure("The customer no longer exists.");
+            return OperationResult<int>.Failure("مشتری دیگر وجود ندارد.");
 
-        if (await _members.BaleIdExistsAsync(input.BaleId, null, cancellationToken))
-            return OperationResult<int>.Failure("Another member already uses this Bale ID.");
+        if (await _members.BaleIdExistsAsync(input.BaleId.Trim(), null, cancellationToken))
+            return OperationResult<int>.Failure("عضو دیگری با این شناسه بله ثبت شده است.");
 
         var member = new CustomerMember
         {
@@ -46,7 +46,7 @@ public class CustomerMemberService
             Name = input.Name.Trim(),
             Description = input.Description?.Trim() ?? string.Empty,
             PhoneNumber = input.PhoneNumber?.Trim() ?? string.Empty,
-            BaleId = input.BaleId
+            BaleId = input.BaleId.Trim()
         };
 
         await _members.AddAsync(member, cancellationToken);
@@ -60,10 +60,10 @@ public class CustomerMemberService
             return OperationResult.Failure(errors);
 
         if (await _members.GetByIdAsync(id, cancellationToken) is null)
-            return OperationResult.Failure("The member no longer exists.");
+            return OperationResult.Failure("عضو دیگر وجود ندارد.");
 
-        if (await _members.BaleIdExistsAsync(input.BaleId, id, cancellationToken))
-            return OperationResult.Failure("Another member already uses this Bale ID.");
+        if (await _members.BaleIdExistsAsync(input.BaleId.Trim(), id, cancellationToken))
+            return OperationResult.Failure("عضو دیگری با این شناسه بله ثبت شده است.");
 
         var updated = await _members.UpdateAsync(
             new CustomerMember
@@ -72,17 +72,17 @@ public class CustomerMemberService
                 Name = input.Name.Trim(),
                 Description = input.Description?.Trim() ?? string.Empty,
                 PhoneNumber = input.PhoneNumber?.Trim() ?? string.Empty,
-                BaleId = input.BaleId
+                BaleId = input.BaleId.Trim()
             },
             cancellationToken);
 
-        return updated ? OperationResult.Success() : OperationResult.Failure("The member no longer exists.");
+        return updated ? OperationResult.Success() : OperationResult.Failure("عضو دیگر وجود ندارد.");
     }
 
     public async Task<OperationResult> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         var deleted = await _members.DeleteAsync(id, cancellationToken);
-        return deleted ? OperationResult.Success() : OperationResult.Failure("The member no longer exists.");
+        return deleted ? OperationResult.Success() : OperationResult.Failure("عضو دیگر وجود ندارد.");
     }
 
     private static MemberDto ToDto(CustomerMember m) =>

@@ -27,7 +27,7 @@ public class CustomerMemberRepository : ICustomerMemberRepository
         return _db.CustomerMembers.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
-    public Task<CustomerMember?> FindByBaleIdAsync(long baleId, CancellationToken cancellationToken = default)
+    public Task<CustomerMember?> FindByBaleIdAsync(string baleId, CancellationToken cancellationToken = default)
     {
         return _db.CustomerMembers
             .AsNoTracking()
@@ -35,7 +35,7 @@ public class CustomerMemberRepository : ICustomerMemberRepository
             .FirstOrDefaultAsync(m => m.BaleId == baleId, cancellationToken);
     }
 
-    public Task<bool> BaleIdExistsAsync(long baleId, int? excludeMemberId, CancellationToken cancellationToken = default)
+    public Task<bool> BaleIdExistsAsync(string baleId, int? excludeMemberId, CancellationToken cancellationToken = default)
     {
         return _db.CustomerMembers.AnyAsync(
             m => m.BaleId == baleId && (excludeMemberId == null || m.Id != excludeMemberId),

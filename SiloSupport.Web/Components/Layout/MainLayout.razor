@@ -1,28 +1,99 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Navigation
 
 <TelerikRootComponent>
-    <div class="app-shell">
-        <header class="app-bar">
-            <span class="app-title">Silo Support</span>
+    <TelerikAppBar ThemeColor="@ThemeConstants.AppBar.ThemeColor.Dark" Class="app-bar">
+        <AppBarSection>
             <AuthorizeView Roles="@AppRoles.Administrator">
                 <Authorized>
-                    <nav class="app-nav">
-                        <NavLink href="/admin/customers" class="app-link" Match="NavLinkMatch.Prefix">Customers</NavLink>
-                        <NavLink href="/admin/conversations" class="app-link" Match="NavLinkMatch.Prefix">Conversations</NavLink>
-                    </nav>
+                    <TelerikButton Icon="@SvgIcon.Menu" FillMode="@ThemeConstants.Button.FillMode.Flat" OnClick="ToggleDrawer">منو</TelerikButton>
                 </Authorized>
             </AuthorizeView>
-            <span class="app-spacer"></span>
-            <AuthorizeView>
-                <Authorized>
+        </AppBarSection>
+        <AppBarSection>
+            <span class="app-title">پشتیبانی سیلو</span>
+        </AppBarSection>
+        <AppBarSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <AppBarSection>
                     <span class="app-user">@context.User.Identity?.Name</span>
-                    <a class="k-button k-button-md k-rounded-md k-button-outline k-button-outline-base" href="/Account/LogoutPost">Sign out</a>
-                </Authorized>
-            </AuthorizeView>
-        </header>
+                </AppBarSection>
+                <AppBarSection>
+                    <TelerikButton Icon="@SvgIcon.Logout" FillMode="@ThemeConstants.Button.FillMode.Outline" OnClick="SignOut">خروج</TelerikButton>
+                </AppBarSection>
+            </Authorized>
+        </AuthorizeView>
+    </TelerikAppBar>
 
-        <main class="app-content">
-            @Body
-        </main>
-    </div>
+    <AuthorizeView Roles="@AppRoles.Administrator">
+        <Authorized>
+            <TelerikDrawer Data="@_items"
+                           @bind-Expanded="_expanded"
+                           Mode="@DrawerMode.Push"
+                           MiniMode="true"
+                           Width="220px"
+                           SelectedItem="@_selected"
+                           TextField="@nameof(NavItem.Text)"
+                           UrlField="@nameof(NavItem.Url)"
+                           IconField="@nameof(NavItem.Icon)">
+                <DrawerContent>
+                    <main class="app-content">
+                        @Body
+                    </main>
+                </DrawerContent>
+            </TelerikDrawer>
+        </Authorized>
+        <NotAuthorized>
+            <main class="app-content">
+                @Body
+            </main>
+        </NotAuthorized>
+    </AuthorizeView>
 </TelerikRootComponent>
+
+@code {
+    /// <summary>One entry of the sidebar. Only administrators see the sidebar at all.</summary>
+    public sealed class NavItem
+    {
+        public string Text { get; init; } = string.Empty;
+        public string Url { get; init; } = "/";
+        public ISvgIcon Icon { get; init; } = SvgIcon.Home;
+    }
+
+    private static readonly List<NavItem> _items = new()
+    {
+        new NavItem { Text = "داشبورد", Url = "/", Icon = SvgIcon.Home },
+        new NavItem { Text = "مشتریان", Url = "/admin/customers", Icon = SvgIcon.User },
+        new NavItem { Text = "گفتگوها", Url = "/admin/conversations", Icon = SvgIcon.Comment }
+    };
+
+    private bool _expanded = true;
+    private NavItem? _selected;
+
+    protected override void OnInitialized()
+    {
+        _selected = Match(Navigation.Uri);
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _selected = Match(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>The dashboard matches only "/", every other item matches its path prefix.</summary>
+    private static NavItem? Match(string uri)
+    {
+        var path = "/" + new Uri(uri).AbsolutePath.Trim('/');
+        return _items.FirstOrDefault(i => i.Url == "/" ? path == "/" : path.StartsWith(i.Url, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void ToggleDrawer() => _expanded = !_expanded;
+
+    private void SignOut() => Navigation.NavigateTo("/Account/LogoutPost", forceLoad: true);
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

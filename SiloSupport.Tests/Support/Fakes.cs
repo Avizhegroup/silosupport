@@ -94,7 +94,7 @@ public sealed class FakeMemberRepository : ICustomerMemberRepository
 
     public FakeMemberRepository(FakeStore store) => _store = store;
 
-    public Task<CustomerMember?> FindByBaleIdAsync(long baleId, CancellationToken cancellationToken = default)
+    public Task<CustomerMember?> FindByBaleIdAsync(string baleId, CancellationToken cancellationToken = default)
     {
         var member = _store.Members.FirstOrDefault(m => m.BaleId == baleId);
         if (member is null)
@@ -114,7 +114,7 @@ public sealed class FakeMemberRepository : ICustomerMemberRepository
 
     public Task<IReadOnlyList<CustomerMember>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<CustomerMember?> GetByIdAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<bool> BaleIdExistsAsync(long baleId, int? excludeMemberId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> BaleIdExistsAsync(string baleId, int? excludeMemberId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task AddAsync(CustomerMember member, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> UpdateAsync(CustomerMember member, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -167,5 +167,7 @@ public sealed class FakeGroupedMessageRepository : ICustomerGroupedMessageReposi
     }
 
     public Task<IReadOnlyList<GroupedMessageDto>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<MessageCountRow>> GetCountsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<MessageTimeRow>> GetSinceAsync(DateTime sinceUtc, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> SetResolvedAsync(int customerId, int messageId, bool isResolved, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }

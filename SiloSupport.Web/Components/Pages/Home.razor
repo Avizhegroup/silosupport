@@ -1,7 +1,206 @@
 @page "/"
 @attribute [Authorize(Roles = AppRoles.Administrator)]
-@inject NavigationManager Navigation
+@inject DashboardService Dashboard
+
+<PageTitle>داشبورد</PageTitle>
+
+<div class="page-header">
+    <h1>داشبورد پیام‌های ارسال‌شده</h1>
+    <div class="period-picker">
+        <label>بازه نمودار روزانه</label>
+        <TelerikDropDownList Data="_periods" TextField="@nameof(PeriodOption.Text)" ValueField="@nameof(PeriodOption.Days)"
+                             Value="_days" ValueChanged="@((int days) => ChangePeriodAsync(days))" Width="160px" />
+    </div>
+</div>
+
+<StatusBanner Message="@_error" IsError="true" />
+
+@if (_data is null && _error is null)
+{
+    <p class="muted">در حال بارگذاری…</p>
+}
+else if (_data is not null)
+{
+    <div class="stat-grid">
+        <div class="stat-tile">
+            <span class="stat-label">مشتریان</span>
+            <span class="stat-value">@_data.CustomerCount</span>
+        </div>
+        <div class="stat-tile">
+            <span class="stat-label">کل پیام‌های ارسال‌شده</span>
+            <span class="stat-value">@_data.TotalMessages</span>
+        </div>
+        <div class="stat-tile stat-warn">
+            <span class="stat-label">حل‌نشده</span>
+            <span class="stat-value">@_data.UnresolvedMessages</span>
+        </div>
+        <div class="stat-tile stat-ok">
+            <span class="stat-label">حل‌شده</span>
+            <span class="stat-value">@_data.ResolvedMessages</span>
+        </div>
+    </div>
+
+    @if (_data.TotalMessages == 0)
+    {
+        <div class="banner banner-info">هنوز پیامی به گروه‌های اولویت ارسال نشده است. نمودارها پس از ارسال اولین پیام نمایش داده می‌شوند.</div>
+    }
+    else
+    {
+        <div class="chart-grid">
+            <div class="panel">
+                <h2>پیام‌ها بر اساس اولویت</h2>
+                <div dir="ltr">
+                    <TelerikChart Height="320px">
+                        <ChartSeriesItems>
+                            <ChartSeries Type="ChartSeriesType.Donut" Data="@_priorityPoints"
+                                         Field="@nameof(PriorityPoint.Count)" CategoryField="@nameof(PriorityPoint.Label)"
+                                         ColorField="@nameof(PriorityPoint.Color)">
+                                <ChartSeriesLabels Visible="true" />
+                            </ChartSeries>
+                        </ChartSeriesItems>
+                        <ChartLegend Position="ChartLegendPosition.Bottom" />
+                        <ChartTooltip Visible="true" />
+                    </TelerikChart>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>پیام‌ها بر اساس مشتری (۱۰ مشتری پرکار)</h2>
+                <div dir="ltr">
+                    <TelerikChart Height="320px">
+                        <ChartSeriesItems>
+                            <ChartSeries Type="ChartSeriesType.Column" Name="بحرانی" Data="@_customerCritical" Color="@CriticalColor" />
+                            <ChartSeries Type="ChartSeriesType.Column" Name="متوسط" Data="@_customerMedium" Color="@MediumColor" />
+                            <ChartSeries Type="ChartSeriesType.Column" Name="کم" Data="@_customerLow" Color="@LowColor" />
+                        </ChartSeriesItems>
+                        <ChartCategoryAxes>
+                            <ChartCategoryAxis Categories="@_customerNames" />
+                        </ChartCategoryAxes>
+                        <ChartLegend Position="ChartLegendPosition.Bottom" />
+                        <ChartTooltip Visible="true" />
+                    </TelerikChart>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>روند روزانه پیام‌ها (@_data.Days روز اخیر، تاریخ شمسی)</h2>
+            <div dir="ltr">
+                <TelerikChart Height="340px">
+                    <ChartSeriesItems>
+                        <ChartSeries Type="ChartSeriesType.Line" Name="بحرانی" Data="@_dailyCritical" Color="@CriticalColor" />
+                        <ChartSeries Type="ChartSeriesType.Line" Name="متوسط" Data="@_dailyMedium" Color="@MediumColor" />
+                        <ChartSeries Type="ChartSeriesType.Line" Name="کم" Data="@_dailyLow" Color="@LowColor" />
+                    </ChartSeriesItems>
+                    <ChartCategoryAxes>
+                        <ChartCategoryAxis Categories="@_dayLabels" />
+                    </ChartCategoryAxes>
+                    <ChartLegend Position="ChartLegendPosition.Bottom" />
+                    <ChartTooltip Visible="true" />
+                </TelerikChart>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>آمار هر مشتری</h2>
+            <TelerikGrid Data="_data.ByCustomer" TItem="CustomerMessageStatsDto" Sortable="true" Height="@(_data.ByCustomer.Count > 8 ? "420px" : null)">
+                <GridColumns>
+                    <GridColumn Field="@nameof(CustomerMessageStatsDto.CustomerName)" Title="مشتری">
+                        <Template>
+                            @{ var s = (CustomerMessageStatsDto)context; }
+                            <a href="/admin/conversations/@s.CustomerId">@s.CustomerName</a>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(CustomerMessageStatsDto.Critical)" Title="بحرانی" Width="110px" />
+                    <GridColumn Field="@nameof(CustomerMessageStatsDto.Medium)" Title="متوسط" Width="110px" />
+                    <GridColumn Field="@nameof(CustomerMessageStatsDto.Low)" Title="کم" Width="110px" />
+                    <GridColumn Field="@nameof(CustomerMessageStatsDto.Total)" Title="مجموع" Width="110px" />
+                    <GridColumn Field="@nameof(CustomerMessageStatsDto.Unresolved)" Title="حل‌نشده" Width="110px" />
+                </GridColumns>
+            </TelerikGrid>
+        </div>
+    }
+}
 
 @code {
-    protected override void OnInitialized() => Navigation.NavigateTo("/admin/customers", replace: true);
+    private const string CriticalColor = "#d92d20";
+    private const string MediumColor = "#f79009";
+    private const string LowColor = "#2e90fa";
+
+    private sealed record PeriodOption(int Days, string Text);
+
+    private sealed class PriorityPoint
+    {
+        public string Label { get; init; } = string.Empty;
+        public int Count { get; init; }
+        public string Color { get; init; } = string.Empty;
+    }
+
+    private static readonly List<PeriodOption> _periods = new()
+    {
+        new PeriodOption(7, "۷ روز اخیر"),
+        new PeriodOption(30, "۳۰ روز اخیر"),
+        new PeriodOption(90, "۹۰ روز اخیر")
+    };
+
+    private int _days = DashboardService.DefaultDays;
+    private DashboardDto? _data;
+    private string? _error;
+
+    private List<PriorityPoint> _priorityPoints = new();
+    // Telerik chart parameters are typed as object collections: series Data is IEnumerable<object>
+    // and the category axis takes object[], so the values are boxed on purpose.
+    private object[] _customerNames = Array.Empty<object>();
+    private List<object> _customerCritical = new(), _customerMedium = new(), _customerLow = new();
+    private object[] _dayLabels = Array.Empty<object>();
+    private List<object> _dailyCritical = new(), _dailyMedium = new(), _dailyLow = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ChangePeriodAsync(int days)
+    {
+        _days = days;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _data = await Dashboard.GetAsync(_days);
+            _error = null;
+        }
+        catch (Exception)
+        {
+            _data = null;
+            _error = "بارگذاری آمار داشبورد انجام نشد. اتصال به پایگاه داده را بررسی کنید.";
+            return;
+        }
+
+        _priorityPoints = _data.ByPriority
+            .Select(p => new PriorityPoint
+            {
+                Label = PriorityHelper.DisplayName(p.Priority),
+                Count = p.Total,
+                Color = p.Priority switch
+                {
+                    GroupPriority.Critical => CriticalColor,
+                    GroupPriority.Medium => MediumColor,
+                    _ => LowColor
+                }
+            })
+            .ToList();
+
+        var top = _data.ByCustomer.Where(c => c.Total > 0).Take(10).ToList();
+        _customerNames = top.Select(c => (object)c.CustomerName).ToArray();
+        _customerCritical = top.Select(c => (object)c.Critical).ToList();
+        _customerMedium = top.Select(c => (object)c.Medium).ToList();
+        _customerLow = top.Select(c => (object)c.Low).ToList();
+
+        // "MM/dd" of the Jalali date keeps the axis readable; the year is part of the title context.
+        _dayLabels = _data.Daily.Select(d => (object)PersianDateFormatter.FormatLocalDate(d.LocalDate)[5..]).ToArray();
+        _dailyCritical = _data.Daily.Select(d => (object)d.Critical).ToList();
+        _dailyMedium = _data.Daily.Select(d => (object)d.Medium).ToList();
+        _dailyLow = _data.Daily.Select(d => (object)d.Low).ToList();
+    }
 }

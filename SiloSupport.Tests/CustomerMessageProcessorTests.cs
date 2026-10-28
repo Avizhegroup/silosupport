@@ -26,8 +26,8 @@ public class CustomerMessageProcessorTests
     {
         _store.Customers.Add(new Customer { Id = 1, Name = "Acme" });
         _store.Customers.Add(new Customer { Id = 2, Name = "Beta" });
-        _store.Members.Add(new CustomerMember { Id = 1, CustomerId = 1, BaleId = AcmeMember, Name = "Sara", PhoneNumber = "0912" });
-        _store.Members.Add(new CustomerMember { Id = 2, CustomerId = 2, BaleId = BetaMember, Name = "Omid", PhoneNumber = "0935" });
+        _store.Members.Add(new CustomerMember { Id = 1, CustomerId = 1, BaleId = AcmeMember.ToString(), Name = "Sara", PhoneNumber = "0912" });
+        _store.Members.Add(new CustomerMember { Id = 2, CustomerId = 2, BaleId = BetaMember.ToString(), Name = "Omid", PhoneNumber = "0935" });
 
         AddGroups(1, 1, 2001);
         AddGroups(2, 4, 3001);
@@ -54,6 +54,30 @@ public class CustomerMessageProcessorTests
 
     private void ClassifyAs(GroupPriority priority, string? analysis = "AI analysis text") =>
         _classifier.Result = PriorityClassificationResult.Success(priority, analysis);
+
+    [Fact]
+    public async Task ProcessAsync_MemberRegisteredWithANonNumericTextId_IsNotMatchedByANumericSender()
+    {
+        _store.Members.Add(new CustomerMember { Id = 3, CustomerId = 1, BaleId = "user_9", Name = "Text id", PhoneNumber = "0" });
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await _processor.ProcessAsync(Text(9, "hello"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.IgnoredUnknownMember, outcome);
+        Assert.Empty(_bale.Sent);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SenderIdIsMatchedAgainstTheStoredTextId()
+    {
+        _store.Members.Add(new CustomerMember { Id = 3, CustomerId = 2, BaleId = "4503599627370495", Name = "Big id", PhoneNumber = "0" });
+        ClassifyAs(GroupPriority.Critical);
+
+        var outcome = await _processor.ProcessAsync(Text(4503599627370495, "urgent"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Equal(3003, _bale.Sent.Single().ChatId); // Beta's Critical group
+    }
 
     // 1
     [Fact]

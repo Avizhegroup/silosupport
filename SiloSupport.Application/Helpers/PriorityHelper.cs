@@ -33,6 +33,15 @@ public static class PriorityHelper
         return false;
     }
 
+    /// <summary>Persian display name used by the admin UI (the stored value stays the English enum name).</summary>
+    public static string DisplayName(GroupPriority priority) => priority switch
+    {
+        GroupPriority.Critical => "بحرانی",
+        GroupPriority.Medium => "متوسط",
+        GroupPriority.Low => "کم",
+        _ => priority.ToString()
+    };
+
     /// <summary>The supported priorities for which the given set contains no group.</summary>
     public static IReadOnlyList<GroupPriority> Missing(IEnumerable<GroupPriority> configured)
     {

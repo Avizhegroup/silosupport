@@ -2,55 +2,55 @@
 @attribute [Authorize(Roles = AppRoles.Administrator)]
 @inject CustomerService Customers
 
-<PageTitle>Customers</PageTitle>
+<PageTitle>مشتریان</PageTitle>
 
 <div class="page-header">
-    <h1>Customers</h1>
-    <LinkButton Href="/admin/customers/new" Primary="true">New customer</LinkButton>
+    <h1>مشتریان</h1>
+    <LinkButton Href="/admin/customers/new" Primary="true">مشتری جدید</LinkButton>
 </div>
 
 <StatusBanner Message="@_message" IsError="_isError" />
 
 @if (_items is null)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">در حال بارگذاری…</p>
 }
 else if (_items.Count == 0)
 {
-    <div class="banner banner-info">No customers yet. Create the first one.</div>
+    <div class="banner banner-info">هنوز مشتری‌ای ثبت نشده است. اولین مشتری را ایجاد کنید.</div>
 }
 else
 {
-    <TelerikGrid Data="_items" TItem="CustomerListItemDto" Pageable="true" PageSize="20" Sortable="true">
+    <TelerikGrid Data="_items" TItem="CustomerListItemDto" Sortable="true" Height="600px">
         <GridColumns>
-            <GridColumn Field="@nameof(CustomerListItemDto.Name)" Title="Name">
+            <GridColumn Field="@nameof(CustomerListItemDto.Name)" Title="نام">
                 <Template>
                     @{ var c = (CustomerListItemDto)context; }
                     <a href="/admin/customers/@c.Id">@c.Name</a>
                 </Template>
             </GridColumn>
-            <GridColumn Field="@nameof(CustomerListItemDto.Description)" Title="Description" />
-            <GridColumn Field="@nameof(CustomerListItemDto.MemberCount)" Title="Members" Width="110px" />
-            <GridColumn Title="Priority groups" Width="260px">
+            <GridColumn Field="@nameof(CustomerListItemDto.Description)" Title="توضیحات" />
+            <GridColumn Field="@nameof(CustomerListItemDto.MemberCount)" Title="تعداد اعضا" Width="120px" />
+            <GridColumn Title="گروه‌های اولویت" Width="280px" Sortable="false">
                 <Template>
                     @{ var c = (CustomerListItemDto)context; }
                     @if (c.MissingPriorities.Count == 0)
                     {
-                        <span class="chip chip-ok">Complete (3/3)</span>
+                        <span class="chip chip-ok">کامل (۳ از ۳)</span>
                     }
                     else
                     {
-                        <span class="chip chip-warn">Missing: @string.Join(", ", c.MissingPriorities)</span>
+                        <span class="chip chip-warn">تنظیم‌نشده: @string.Join("، ", c.MissingPriorities.Select(PriorityHelper.DisplayName))</span>
                     }
                 </Template>
             </GridColumn>
-            <GridColumn Title="Actions" Width="260px" Sortable="false">
+            <GridColumn Title="عملیات" Width="300px" Sortable="false">
                 <Template>
                     @{ var c = (CustomerListItemDto)context; }
                     <div class="row-actions">
-                        <LinkButton Href="@($"/admin/customers/{c.Id}")">Details</LinkButton>
-                        <LinkButton Href="@($"/admin/customers/{c.Id}/edit")">Edit</LinkButton>
-                        <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => DeleteAsync(c))">Delete</TelerikButton>
+                        <LinkButton Href="@($"/admin/customers/{c.Id}")">جزئیات</LinkButton>
+                        <LinkButton Href="@($"/admin/customers/{c.Id}/edit")">ویرایش</LinkButton>
+                        <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => AskDelete(c))">حذف</TelerikButton>
                     </div>
                 </Template>
             </GridColumn>
@@ -58,10 +58,15 @@ else
     </TelerikGrid>
 }
 
-@code {
-    [CascadingParameter] public DialogFactory Dialogs { get; set; } = default!;
+<ConfirmDialog Visible="_toDelete is not null"
+               Title="حذف مشتری"
+               Message="@($"مشتری «{_toDelete?.Name}» همراه با اعضا و گروه‌های اولویت حذف شود؟ این کار قابل بازگشت نیست.")"
+               OnConfirm="DeleteAsync"
+               OnCancel="CancelDelete" />
 
+@code {
     private List<CustomerListItemDto>? _items;
+    private CustomerListItemDto? _toDelete;
     private string? _message;
     private bool _isError;
 
@@ -69,17 +74,20 @@ else
 
     private async Task LoadAsync() => _items = (await Customers.GetListAsync()).ToList();
 
-    private async Task DeleteAsync(CustomerListItemDto customer)
+    private void AskDelete(CustomerListItemDto customer) => _toDelete = customer;
+
+    private void CancelDelete() => _toDelete = null;
+
+    private async Task DeleteAsync()
     {
-        var confirmed = await Dialogs.ConfirmAsync(
-            $"Delete '{customer.Name}' together with its members and priority groups? This cannot be undone.",
-            "Delete customer");
-        if (!confirmed)
+        var customer = _toDelete;
+        _toDelete = null;
+        if (customer is null)
             return;
 
         var result = await Customers.DeleteAsync(customer.Id);
         _isError = !result.Succeeded;
-        _message = result.Succeeded ? "Customer deleted." : result.FirstError ?? "The customer could not be deleted.";
+        _message = result.Succeeded ? "مشتری حذف شد." : result.FirstError ?? "حذف مشتری انجام نشد.";
 
         await LoadAsync();
     }

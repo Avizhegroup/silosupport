@@ -49,9 +49,9 @@ public class PersistenceTests : TestBase
     {
         var a = await AddCustomerAsync("A");
         var b = await AddCustomerAsync("B");
-        await AddMemberAsync(a.Id, 500);
+        await AddMemberAsync(a.Id, "500");
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => AddMemberAsync(b.Id, 500));
+        await Assert.ThrowsAsync<DbUpdateException>(() => AddMemberAsync(b.Id, "500"));
     }
 
     [Fact]
@@ -100,18 +100,34 @@ public class PersistenceTests : TestBase
         Assert.Equal("Critical", stored);
     }
 
-    [Fact]
-    public async Task BaleId_LargerThan32Bits_RoundTrips()
+    [Theory]
+    [InlineData("4503599627370495")] // 2^52 - 1: the documented maximum of significant bits of a Bale id
+    [InlineData("123")]
+    [InlineData("user_42")]
+    public async Task MemberBaleId_IsStoredAndFoundAsText(string baleId)
     {
         var customer = await AddCustomerAsync();
-        const long big = 4_503_599_627_370_495; // 2^52 - 1: the documented maximum of significant bits
-        await AddMemberAsync(customer.Id, big);
+        await AddMemberAsync(customer.Id, baleId);
 
-        var found = await Get<ICustomerMemberRepository>().FindByBaleIdAsync(big);
+        var found = await Get<ICustomerMemberRepository>().FindByBaleIdAsync(baleId);
 
         Assert.NotNull(found);
-        Assert.Equal(customer.Id, found!.CustomerId);
+        Assert.Equal(baleId, found!.BaleId);
+        Assert.Equal(customer.Id, found.CustomerId);
         Assert.Equal("Acme", found.Customer!.Name);
+    }
+
+    [Fact]
+    public async Task MemberBaleId_IsStoredAsATextColumn()
+    {
+        var customer = await AddCustomerAsync();
+        await AddMemberAsync(customer.Id, "00123");
+
+        var stored = await Db.Database
+            .SqlQueryRaw<string>("SELECT BaleId AS Value FROM CustomerMembers")
+            .SingleAsync();
+
+        Assert.Equal("00123", stored); // text keeps leading zeros; a number column would not
     }
 
     [Fact]
@@ -172,7 +188,7 @@ public class SupportServicesTests : TestBase
         var second = await service.CreateAsync(customer.Id, new GroupInput { Name = "L2", BaleId = 11, Priority = GroupPriority.Low });
 
         Assert.False(second.Succeeded);
-        Assert.Contains("already has a Low", second.FirstError);
+        Assert.Contains("«کم»", second.FirstError);
     }
 
     [Fact]
@@ -186,7 +202,7 @@ public class SupportServicesTests : TestBase
         var result = await service.CreateAsync(b.Id, new GroupInput { Name = "g", BaleId = 10, Priority = GroupPriority.Low });
 
         Assert.False(result.Succeeded);
-        Assert.Contains("Bale group ID", result.FirstError);
+        Assert.Contains("گروه بله", result.FirstError);
     }
 
     [Theory]
@@ -256,12 +272,12 @@ public class SupportServicesTests : TestBase
         var a = await AddCustomerAsync("A");
         var b = await AddCustomerAsync("B");
         var service = Get<CustomerMemberService>();
-        Assert.True((await service.CreateAsync(a.Id, new MemberInput { Name = "x", BaleId = 77 })).Succeeded);
+        Assert.True((await service.CreateAsync(a.Id, new MemberInput { Name = "x", BaleId = "77" })).Succeeded);
 
-        var duplicate = await service.CreateAsync(b.Id, new MemberInput { Name = "y", BaleId = 77 });
+        var duplicate = await service.CreateAsync(b.Id, new MemberInput { Name = "y", BaleId = " 77 " });
 
         Assert.False(duplicate.Succeeded);
-        Assert.Contains("Bale ID", duplicate.FirstError);
+        Assert.Contains("شناسه بله", duplicate.FirstError);
     }
 
     [Fact]
@@ -270,17 +286,21 @@ public class SupportServicesTests : TestBase
         var customer = await AddCustomerAsync();
         var service = Get<CustomerMemberService>();
 
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "", BaleId = 1 })).Succeeded);
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = 0 })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "", BaleId = "1" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "0" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "   " })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "12 34" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = new string('9', 65) })).Succeeded);
     }
 
     [Fact]
     public async Task MemberService_MemberStaysWithItsCustomerWhenEdited()
     {
         var a = await AddCustomerAsync("A");
-        var member = await AddMemberAsync(a.Id, 5, "old");
+        var member = await AddMemberAsync(a.Id, "5", "old");
 
-        await Get<CustomerMemberService>().UpdateAsync(member.Id, new MemberInput { Name = "new", BaleId = 5, PhoneNumber = "1" });
+        await Get<CustomerMemberService>().UpdateAsync(member.Id, new MemberInput { Name = "new", BaleId = "5", PhoneNumber = "1" });
 
         var loaded = await Get<CustomerMemberService>().GetAsync(member.Id);
         Assert.Equal(a.Id, loaded!.CustomerId);
@@ -305,7 +325,7 @@ public class SupportServicesTests : TestBase
     public async Task CustomerService_DeletingCustomerWithoutHistoryRemovesItsMembersAndGroups()
     {
         var customer = await AddCustomerAsync();
-        await AddMemberAsync(customer.Id, 5);
+        await AddMemberAsync(customer.Id, "5");
         await AddGroupAsync(customer.Id, GroupPriority.Low, 10);
 
         var result = await Get<CustomerService>().DeleteAsync(customer.Id);
@@ -321,7 +341,7 @@ public class SupportServicesTests : TestBase
     {
         var customer = await AddCustomerAsync();
         await AddGroupAsync(customer.Id, GroupPriority.Low, 10);
-        await AddMemberAsync(customer.Id, 5);
+        await AddMemberAsync(customer.Id, "5");
 
         var item = Assert.Single(await Get<CustomerService>().GetListAsync());
 
@@ -441,6 +461,39 @@ public class MigrationTests : IDisposable
         await db.SaveChangesAsync();
 
         db.CustomerGroups.Add(new CustomerGroup { CustomerId = 1, Name = "g2", BaleId = 2, Priority = GroupPriority.Low });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task MigrationChain_ConvertsExistingNumericMemberBaleIdsToText_AndKeepsTheUniqueIndex()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(_connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        var migrator = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>(db.Database);
+
+        // The schema as it was before this change: BaleId is a number.
+        await migrator.MigrateAsync("20261027090000_InitialCreate");
+        await db.Database.ExecuteSqlRawAsync("INSERT INTO Customers (Name, Description) VALUES ('A', '')");
+        await db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO CustomerMembers (Name, Description, PhoneNumber, BaleId, CustomerId) VALUES ('Sara', '', '0912', 4503599627370495, 1)");
+
+        await db.Database.MigrateAsync();
+
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        var stored = await db.Database
+            .SqlQueryRaw<string>("SELECT BaleId AS Value FROM CustomerMembers")
+            .SingleAsync();
+        Assert.Equal("4503599627370495", stored);
+
+        var columnType = await db.Database
+            .SqlQueryRaw<string>("SELECT type AS Value FROM pragma_table_info('CustomerMembers') WHERE name = 'BaleId'")
+            .SingleAsync();
+        Assert.Contains("TEXT", columnType, StringComparison.OrdinalIgnoreCase);
+
+        // Text ids are accepted now, and the unique index still protects them.
+        db.CustomerMembers.Add(new CustomerMember { CustomerId = 1, Name = "Text", Description = "", PhoneNumber = "", BaleId = "user_1" });
+        await db.SaveChangesAsync();
+        db.CustomerMembers.Add(new CustomerMember { CustomerId = 1, Name = "Dup", Description = "", PhoneNumber = "", BaleId = "user_1" });
         await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
