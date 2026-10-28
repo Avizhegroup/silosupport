@@ -148,10 +148,12 @@ else if (_data is not null)
     private string? _error;
 
     private List<PriorityPoint> _priorityPoints = new();
-    private List<string> _customerNames = new();
-    private List<int> _customerCritical = new(), _customerMedium = new(), _customerLow = new();
-    private List<string> _dayLabels = new();
-    private List<int> _dailyCritical = new(), _dailyMedium = new(), _dailyLow = new();
+    // Telerik chart parameters are typed as object collections: series Data is IEnumerable<object>
+    // and the category axis takes object[], so the values are boxed on purpose.
+    private object[] _customerNames = Array.Empty<object>();
+    private List<object> _customerCritical = new(), _customerMedium = new(), _customerLow = new();
+    private object[] _dayLabels = Array.Empty<object>();
+    private List<object> _dailyCritical = new(), _dailyMedium = new(), _dailyLow = new();
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -190,15 +192,15 @@ else if (_data is not null)
             .ToList();
 
         var top = _data.ByCustomer.Where(c => c.Total > 0).Take(10).ToList();
-        _customerNames = top.Select(c => c.CustomerName).ToList();
-        _customerCritical = top.Select(c => c.Critical).ToList();
-        _customerMedium = top.Select(c => c.Medium).ToList();
-        _customerLow = top.Select(c => c.Low).ToList();
+        _customerNames = top.Select(c => (object)c.CustomerName).ToArray();
+        _customerCritical = top.Select(c => (object)c.Critical).ToList();
+        _customerMedium = top.Select(c => (object)c.Medium).ToList();
+        _customerLow = top.Select(c => (object)c.Low).ToList();
 
         // "MM/dd" of the Jalali date keeps the axis readable; the year is part of the title context.
-        _dayLabels = _data.Daily.Select(d => PersianDateFormatter.FormatLocalDate(d.LocalDate)[5..]).ToList();
-        _dailyCritical = _data.Daily.Select(d => d.Critical).ToList();
-        _dailyMedium = _data.Daily.Select(d => d.Medium).ToList();
-        _dailyLow = _data.Daily.Select(d => d.Low).ToList();
+        _dayLabels = _data.Daily.Select(d => (object)PersianDateFormatter.FormatLocalDate(d.LocalDate)[5..]).ToArray();
+        _dailyCritical = _data.Daily.Select(d => (object)d.Critical).ToList();
+        _dailyMedium = _data.Daily.Select(d => (object)d.Medium).ToList();
+        _dailyLow = _data.Daily.Select(d => (object)d.Low).ToList();
     }
 }
