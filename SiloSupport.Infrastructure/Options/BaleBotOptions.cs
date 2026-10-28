@@ -8,7 +8,7 @@ public class BaleBotOptions
     /// <summary>When false the polling worker does not start (the administrative UI still works).</summary>
     public bool Enabled { get; set; } = true;
 
-    /// <summary>Bot token from @botfather. Keep it in user secrets / environment variables, never in source control.</summary>
+    /// <summary>Bot token from @botfather (set it in appsettings.json).</summary>
     public string BotToken { get; set; } = string.Empty;
 
     public string ApiBaseUrl { get; set; } = "https://tapi.bale.ai";

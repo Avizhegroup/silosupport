@@ -31,8 +31,8 @@
 		<PackageVersion Include="Concentus" Version="2.2.2" />
 		<PackageVersion Include="Concentus.OggFile" Version="1.0.6" />
     <PackageVersion Include="MediatR" Version="13.1.0" />
-		<!-- Support routing feature (net10.0 projects: Persistence, Web, CustomerSupport service, Tests). Versions could not be restored in the
-		     authoring sandbox (NuGet blocked) - verify with `dotnet restore` and bump to the latest 10.0.x release. -->
+		<!-- Support routing feature (EF Core / Identity versions follow $(AspNetCoreVersion)). Test package versions could not be
+		     restored in the authoring sandbox (NuGet blocked) - verify with `dotnet restore`. -->
 		<PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(AspNetCoreVersion)" />

@@ -27,7 +27,7 @@ public static class IdentitySeeder
         {
             logger.LogWarning(
                 "AdminSeed:UserName / AdminSeed:Password are not configured; no administrator was created. " +
-                "Set them via user secrets or environment variables to create the first administrator.");
+                "Set them in appsettings.json to create the first administrator.");
             return;
         }
 
