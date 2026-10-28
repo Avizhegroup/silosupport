@@ -1,0 +1,37 @@
+@page "/Account/Login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Sign in</PageTitle>
+
+<div class="login-card">
+    <h1>Silo Support</h1>
+    <p class="login-sub">Administrator sign in</p>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="login-error" role="alert">@Error</div>
+    }
+
+    <form method="post" action="/Account/LoginPost">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@SafeReturnUrl" />
+
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required />
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <button type="submit">Sign in</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")] public string? Error { get; set; }
+
+    private string SafeReturnUrl => SiloSupport.Web.Security.ReturnUrlHelper.Resolve(ReturnUrl);
+}

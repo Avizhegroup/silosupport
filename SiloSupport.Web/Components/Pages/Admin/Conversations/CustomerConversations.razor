@@ -1,0 +1,130 @@
+@page "/admin/conversations"
+@page "/admin/conversations/{CustomerId:int}"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject CustomerService Customers
+@inject ConversationService Conversations
+@inject NavigationManager Navigation
+
+<PageTitle>Conversations</PageTitle>
+
+<div class="page-header">
+    <h1>Customer conversations</h1>
+</div>
+
+<div class="form-row">
+    <label>Customer</label>
+    <TelerikDropDownList Data="_customers" TextField="@nameof(CustomerListItemDto.Name)" ValueField="@nameof(CustomerListItemDto.Id)"
+                         Value="_selectedId" ValueChanged="@((int id) => OnCustomerChanged(id))"
+                         DefaultText="Select a customer" Width="360px" />
+</div>
+
+<StatusBanner Message="@_error" IsError="true" />
+
+@if (CustomerId is null)
+{
+    <div class="banner banner-info">Select a customer to see the messages forwarded to its priority groups.</div>
+}
+else if (_loading)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_conversation is null)
+{
+    <div class="banner banner-error">The customer does not exist.</div>
+}
+else
+{
+    <MissingPriorityAlert Missing="_conversation.MissingPriorities" />
+
+    @if (_conversation.Groups.Count == 0)
+    {
+        <div class="banner banner-info">This customer has no priority groups yet.</div>
+    }
+
+    @foreach (var group in _conversation.Groups)
+    {
+        <div class="panel">
+            <div class="panel-head">
+                <h2>@group.GroupName <PriorityChip Priority="group.Priority" /></h2>
+                <span class="muted">@group.Messages.Count message@(group.Messages.Count == 1 ? "" : "s")</span>
+            </div>
+
+            @if (group.Messages.Count == 0)
+            {
+                <p class="muted">No messages forwarded to this group yet.</p>
+            }
+            else
+            {
+                <TelerikGrid Data="group.Messages" TItem="GroupedMessageDto">
+                    <GridColumns>
+                        <GridColumn Title="Time" Width="170px">
+                            <Template>
+                                @{ var m = (GroupedMessageDto)context; }
+                                @m.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Title="Message">
+                            <Template>
+                                @{ var m = (GroupedMessageDto)context; }
+                                <div class="message-text">@m.Message</div>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Title="Status" Width="170px">
+                            <Template>
+                                @{ var m = (GroupedMessageDto)context; }
+                                <TelerikSwitch Value="m.IsResolved" ValueChanged="@((bool value) => SetResolvedAsync(m, value))"
+                                               OnLabel="Resolved" OffLabel="Unresolved" Width="130px" />
+                            </Template>
+                        </GridColumn>
+                    </GridColumns>
+                </TelerikGrid>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int? CustomerId { get; set; }
+
+    private IReadOnlyList<CustomerListItemDto> _customers = Array.Empty<CustomerListItemDto>();
+    private CustomerConversationDto? _conversation;
+    private bool _loading;
+    private string? _error;
+
+    private int _selectedId => CustomerId ?? 0;
+
+    protected override async Task OnInitializedAsync() => _customers = await Customers.GetListAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _conversation = null;
+        _error = null;
+        if (CustomerId is null)
+            return;
+
+        // Only the selected customer's messages are loaded (filtered in the database).
+        _loading = true;
+        try
+        {
+            _conversation = await Conversations.GetAsync(CustomerId.Value);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnCustomerChanged(int customerId)
+    {
+        Navigation.NavigateTo(customerId == 0 ? "/admin/conversations" : $"/admin/conversations/{customerId}");
+    }
+
+    private async Task SetResolvedAsync(GroupedMessageDto message, bool isResolved)
+    {
+        var result = await Conversations.SetResolvedAsync(CustomerId!.Value, message.Id, isResolved);
+        _error = result.Succeeded ? null : result.FirstError ?? "The status could not be saved.";
+
+        // Reload so the page always shows what is persisted.
+        _conversation = await Conversations.GetAsync(CustomerId.Value);
+    }
+}

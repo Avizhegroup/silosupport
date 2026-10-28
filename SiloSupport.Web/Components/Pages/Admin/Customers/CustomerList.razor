@@ -1,0 +1,86 @@
+@page "/admin/customers"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject CustomerService Customers
+
+<PageTitle>Customers</PageTitle>
+
+<div class="page-header">
+    <h1>Customers</h1>
+    <LinkButton Href="/admin/customers/new" Primary="true">New customer</LinkButton>
+</div>
+
+<StatusBanner Message="@_message" IsError="_isError" />
+
+@if (_items is null)
+{
+    <p class="muted">Loading…</p>
+}
+else if (_items.Count == 0)
+{
+    <div class="banner banner-info">No customers yet. Create the first one.</div>
+}
+else
+{
+    <TelerikGrid Data="_items" TItem="CustomerListItemDto" Pageable="true" PageSize="20" Sortable="true">
+        <GridColumns>
+            <GridColumn Field="@nameof(CustomerListItemDto.Name)" Title="Name">
+                <Template>
+                    @{ var c = (CustomerListItemDto)context; }
+                    <a href="/admin/customers/@c.Id">@c.Name</a>
+                </Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(CustomerListItemDto.Description)" Title="Description" />
+            <GridColumn Field="@nameof(CustomerListItemDto.MemberCount)" Title="Members" Width="110px" />
+            <GridColumn Title="Priority groups" Width="260px">
+                <Template>
+                    @{ var c = (CustomerListItemDto)context; }
+                    @if (c.MissingPriorities.Count == 0)
+                    {
+                        <span class="chip chip-ok">Complete (3/3)</span>
+                    }
+                    else
+                    {
+                        <span class="chip chip-warn">Missing: @string.Join(", ", c.MissingPriorities)</span>
+                    }
+                </Template>
+            </GridColumn>
+            <GridColumn Title="Actions" Width="260px" Sortable="false">
+                <Template>
+                    @{ var c = (CustomerListItemDto)context; }
+                    <div class="row-actions">
+                        <LinkButton Href="@($"/admin/customers/{c.Id}")">Details</LinkButton>
+                        <LinkButton Href="@($"/admin/customers/{c.Id}/edit")">Edit</LinkButton>
+                        <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => DeleteAsync(c))">Delete</TelerikButton>
+                    </div>
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </TelerikGrid>
+}
+
+@code {
+    [CascadingParameter] public DialogFactory Dialogs { get; set; } = default!;
+
+    private List<CustomerListItemDto>? _items;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _items = (await Customers.GetListAsync()).ToList();
+
+    private async Task DeleteAsync(CustomerListItemDto customer)
+    {
+        var confirmed = await Dialogs.ConfirmAsync(
+            $"Delete '{customer.Name}' together with its members and priority groups? This cannot be undone.",
+            "Delete customer");
+        if (!confirmed)
+            return;
+
+        var result = await Customers.DeleteAsync(customer.Id);
+        _isError = !result.Succeeded;
+        _message = result.Succeeded ? "Customer deleted." : result.FirstError ?? "The customer could not be deleted.";
+
+        await LoadAsync();
+    }
+}

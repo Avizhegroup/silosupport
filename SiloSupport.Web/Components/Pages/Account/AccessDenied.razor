@@ -1,0 +1,12 @@
+@page "/Account/AccessDenied"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Access denied</PageTitle>
+
+<div class="login-card">
+    <h1>Access denied</h1>
+    <p class="login-sub">Your account is not allowed to view this page.</p>
+    <a href="/Account/LogoutPost">Sign out</a>
+</div>

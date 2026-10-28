@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SiloSupport.Domain\SiloSupport.Domain.csproj" />
+    <ProjectReference Include="..\SiloSupport.Application\SiloSupport.Application.csproj" />
+  </ItemGroup>
+
+</Project>

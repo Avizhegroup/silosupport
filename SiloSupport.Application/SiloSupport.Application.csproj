@@ -2,6 +2,11 @@
 
   <ItemGroup>
       <PackageReference Include="MediatR"  />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SiloSupport.Domain\SiloSupport.Domain.csproj" />
   </ItemGroup>
 
 </Project>

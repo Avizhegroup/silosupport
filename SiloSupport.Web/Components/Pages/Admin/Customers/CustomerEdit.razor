@@ -1,0 +1,117 @@
+@page "/admin/customers/new"
+@page "/admin/customers/{Id:int}/edit"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject CustomerService Customers
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "New customer" : "Edit customer")</PageTitle>
+
+<div class="page-header">
+    <h1>@(IsNew ? "New customer" : "Edit customer")</h1>
+</div>
+
+@if (_notFound)
+{
+    <div class="banner banner-error">The customer does not exist.</div>
+}
+else if (_model is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    <div class="panel form-panel">
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="form-row">
+                <label>Name</label>
+                <TelerikTextBox @bind-Value="_model.Name" Width="100%" />
+                <ValidationMessage For="() => _model.Name" />
+            </div>
+            <div class="form-row">
+                <label>Description</label>
+                <TelerikTextArea @bind-Value="_model.Description" Width="100%" />
+                <ValidationMessage For="() => _model.Description" />
+            </div>
+
+            <StatusBanner Message="@ErrorText" IsError="true" />
+
+            <div class="form-actions">
+                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">Save</TelerikButton>
+                <LinkButton Href="@CancelUrl">Cancel</LinkButton>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private CustomerInput? _model;
+    private List<string> _errors = new();
+    private bool _saving;
+
+    private string ErrorText => string.Join(" ", _errors);
+    private bool _notFound;
+
+    private bool IsNew => Id is null;
+
+    private string CancelUrl => IsNew ? "/admin/customers" : $"/admin/customers/{Id}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _errors.Clear();
+        _notFound = false;
+
+        if (IsNew)
+        {
+            _model = new CustomerInput();
+            return;
+        }
+
+        var customer = await Customers.GetAsync(Id!.Value);
+        if (customer is null)
+        {
+            _notFound = true;
+            return;
+        }
+
+        _model = new CustomerInput { Name = customer.Name, Description = customer.Description };
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            if (IsNew)
+            {
+                var created = await Customers.CreateAsync(_model!);
+                if (!created.Succeeded)
+                {
+                    _errors = created.Errors.ToList();
+                    return;
+                }
+
+                Navigation.NavigateTo($"/admin/customers/{created.Value}");
+            }
+            else
+            {
+                var updated = await Customers.UpdateAsync(Id!.Value, _model!);
+                if (!updated.Succeeded)
+                {
+                    _errors = updated.Errors.ToList();
+                    return;
+                }
+
+                Navigation.NavigateTo($"/admin/customers/{Id}");
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

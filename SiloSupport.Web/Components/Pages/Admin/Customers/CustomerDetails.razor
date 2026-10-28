@@ -1,0 +1,157 @@
+@page "/admin/customers/{Id:int}"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject CustomerService Customers
+@inject CustomerMemberService Members
+@inject CustomerGroupService Groups
+
+<PageTitle>@(_details?.Customer.Name ?? "Customer")</PageTitle>
+
+@if (_loaded && _details is null)
+{
+    <div class="banner banner-error">The customer does not exist.</div>
+    <LinkButton Href="/admin/customers">Back to customers</LinkButton>
+}
+else if (_details is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    <div class="page-header">
+        <h1>@_details.Customer.Name</h1>
+        <div class="page-actions">
+            <LinkButton Href="@($"/admin/conversations/{Id}")">Conversations</LinkButton>
+            <LinkButton Href="@($"/admin/customers/{Id}/edit")">Edit</LinkButton>
+            <LinkButton Href="/admin/customers">Back</LinkButton>
+        </div>
+    </div>
+    <p class="muted">@(string.IsNullOrWhiteSpace(_details.Customer.Description) ? "No description." : _details.Customer.Description)</p>
+
+    <StatusBanner Message="@_message" IsError="_isError" />
+    <MissingPriorityAlert Missing="_details.MissingPriorities" />
+
+    <div class="panel">
+        <div class="panel-head">
+            <h2>Members of @_details.Customer.Name</h2>
+            <LinkButton Href="@($"/admin/customers/{Id}/members/new")" Primary="true">Add member</LinkButton>
+        </div>
+
+        @if (_details.Members.Count == 0)
+        {
+            <div class="banner banner-info">This customer has no members. Messages from unregistered senders are ignored.</div>
+        }
+        else
+        {
+            <TelerikGrid Data="_details.Members" TItem="MemberDto" Sortable="true">
+                <GridColumns>
+                    <GridColumn Field="@nameof(MemberDto.Name)" Title="Name" />
+                    <GridColumn Field="@nameof(MemberDto.PhoneNumber)" Title="Phone" />
+                    <GridColumn Field="@nameof(MemberDto.BaleId)" Title="Bale ID" />
+                    <GridColumn Field="@nameof(MemberDto.Description)" Title="Description" />
+                    <GridColumn Title="Actions" Width="200px" Sortable="false">
+                        <Template>
+                            @{ var m = (MemberDto)context; }
+                            <div class="row-actions">
+                                <LinkButton Href="@($"/admin/customers/{Id}/members/{m.Id}/edit")">Edit</LinkButton>
+                                <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => DeleteMemberAsync(m))">Delete</TelerikButton>
+                            </div>
+                        </Template>
+                    </GridColumn>
+                </GridColumns>
+            </TelerikGrid>
+        }
+    </div>
+
+    <div class="panel">
+        <h2>Destination priority groups</h2>
+        <p class="muted">One Bale group per priority. Classified messages are forwarded to the group of their priority.</p>
+
+        <TelerikGrid Data="_details.PriorityGroups" TItem="PriorityGroupStatusDto">
+            <GridColumns>
+                <GridColumn Title="Priority" Width="140px">
+                    <Template>
+                        @{ var s = (PriorityGroupStatusDto)context; }
+                        <PriorityChip Priority="s.Priority" />
+                    </Template>
+                </GridColumn>
+                <GridColumn Title="Group name">
+                    <Template>
+                        @{ var s = (PriorityGroupStatusDto)context; }
+                        @if (s.Group is not null)
+                        {
+                            @s.Group.Name
+                        }
+                        else
+                        {
+                            <span class="chip chip-warn">Not configured</span>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Title="Bale group ID">
+                    <Template>
+                        @{ var s = (PriorityGroupStatusDto)context; }
+                        @(s.Group?.BaleId.ToString() ?? "")
+                    </Template>
+                </GridColumn>
+                <GridColumn Title="Actions" Width="200px">
+                    <Template>
+                        @{ var s = (PriorityGroupStatusDto)context; }
+                        <div class="row-actions">
+                            @if (s.Group is not null)
+                            {
+                                var g = s.Group;
+                                <LinkButton Href="@($"/admin/customers/{Id}/groups/{g.Id}/edit")">Edit</LinkButton>
+                                <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => DeleteGroupAsync(g))">Delete</TelerikButton>
+                            }
+                            else
+                            {
+                                <LinkButton Href="@($"/admin/customers/{Id}/groups/new?priority={s.Priority}")" Primary="true">Configure</LinkButton>
+                            }
+                        </div>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </TelerikGrid>
+    </div>
+}
+
+@code {
+    [CascadingParameter] public DialogFactory Dialogs { get; set; } = default!;
+
+    [Parameter] public int Id { get; set; }
+
+    private CustomerDetailsDto? _details;
+    private bool _loaded;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _details = await Customers.GetDetailsAsync(Id);
+        _loaded = true;
+    }
+
+    private async Task DeleteMemberAsync(MemberDto member)
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete member '{member.Name}'?", "Delete member"))
+            return;
+
+        var result = await Members.DeleteAsync(member.Id);
+        _isError = !result.Succeeded;
+        _message = result.Succeeded ? "Member deleted." : result.FirstError ?? "The member could not be deleted.";
+        await LoadAsync();
+    }
+
+    private async Task DeleteGroupAsync(GroupDto group)
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete the {group.Priority} group '{group.Name}'?", "Delete priority group"))
+            return;
+
+        var result = await Groups.DeleteAsync(group.Id);
+        _isError = !result.Succeeded;
+        _message = result.Succeeded ? "Group deleted." : result.FirstError ?? "The group could not be deleted.";
+        await LoadAsync();
+    }
+}

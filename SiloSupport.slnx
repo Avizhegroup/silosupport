@@ -6,14 +6,25 @@
   </Folder>
   <Folder Name="/Solution Items/Docs/">
     <File Path="Docs/bale-docs.md" />
+    <File Path="Docs/RAG-Chat-Guide.md" />
+    <File Path="Docs/customer-support-routing.md" />
   </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/Core/">
+    <Project Path="SiloSupport.Domain/SiloSupport.Domain.csproj" />
     <Project Path="SiloSupport.Application/SiloSupport.Application.csproj" />
     <Project Path="SiloSupport.Infrastructure/SiloSupport.Infrastructure.csproj" />
+    <Project Path="SiloSupport.Persistence/SiloSupport.Persistence.csproj" />
   </Folder>
   <Folder Name="/src/Presentation/" />
   <Folder Name="/src/Presentation/Services/">
     <Project Path="SiloSupport.Service.CustomerChat/SiloSupport.Service.CustomerChat.csproj" />
+    <Project Path="SiloSupport.Service.CustomerSupport/SiloSupport.Service.CustomerSupport.csproj" />
+  </Folder>
+  <Folder Name="/src/Presentation/Web/">
+    <Project Path="SiloSupport.Web/SiloSupport.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="SiloSupport.Tests/SiloSupport.Tests.csproj" />
   </Folder>
 </Solution>

@@ -22,7 +22,7 @@
 		<PackageVersion Include="Serilog.Sinks.Seq" Version="9.0.0" />
 		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="$(AspNetCoreVersion)" />
-		<PackageVersion Include="Microsoft.Extensions.Http" Version="9.0.10" />
+		<PackageVersion Include="Microsoft.Extensions.Http" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="$(AspNetCoreVersion)" />
@@ -31,5 +31,15 @@
 		<PackageVersion Include="Concentus" Version="2.2.2" />
 		<PackageVersion Include="Concentus.OggFile" Version="1.0.6" />
     <PackageVersion Include="MediatR" Version="13.1.0" />
+		<!-- Support routing feature (net10.0 projects: Persistence, Web, CustomerSupport service, Tests). Versions could not be restored in the
+		     authoring sandbox (NuGet blocked) - verify with `dotnet restore` and bump to the latest 10.0.x release. -->
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(AspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(AspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(AspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(AspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+		<PackageVersion Include="xunit" Version="2.9.3" />
+		<PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+
 	</ItemGroup>
 </Project>

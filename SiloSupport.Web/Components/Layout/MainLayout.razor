@@ -1,0 +1,28 @@
+@inherits LayoutComponentBase
+
+<TelerikRootComponent>
+    <div class="app-shell">
+        <header class="app-bar">
+            <span class="app-title">Silo Support</span>
+            <AuthorizeView Roles="@AppRoles.Administrator">
+                <Authorized>
+                    <nav class="app-nav">
+                        <NavLink href="/admin/customers" class="app-link" Match="NavLinkMatch.Prefix">Customers</NavLink>
+                        <NavLink href="/admin/conversations" class="app-link" Match="NavLinkMatch.Prefix">Conversations</NavLink>
+                    </nav>
+                </Authorized>
+            </AuthorizeView>
+            <span class="app-spacer"></span>
+            <AuthorizeView>
+                <Authorized>
+                    <span class="app-user">@context.User.Identity?.Name</span>
+                    <a class="k-button k-button-md k-rounded-md k-button-outline k-button-outline-base" href="/Account/LogoutPost">Sign out</a>
+                </Authorized>
+            </AuthorizeView>
+        </header>
+
+        <main class="app-content">
+            @Body
+        </main>
+    </div>
+</TelerikRootComponent>

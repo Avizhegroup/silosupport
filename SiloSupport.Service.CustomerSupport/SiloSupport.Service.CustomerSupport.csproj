@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <ItemGroup>
+    <!-- Central versions are 9.0.x for the net9.0 projects; this net10.0 host needs the 10.0 packages. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" VersionOverride="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" VersionOverride="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" VersionOverride="10.0.0" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SiloSupport.Application\SiloSupport.Application.csproj" />
+    <ProjectReference Include="..\SiloSupport.Infrastructure\SiloSupport.Infrastructure.csproj" />
+    <ProjectReference Include="..\SiloSupport.Persistence\SiloSupport.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

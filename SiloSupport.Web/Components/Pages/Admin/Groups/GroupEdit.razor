@@ -1,0 +1,152 @@
+@page "/admin/customers/{CustomerId:int}/groups/new"
+@page "/admin/customers/{CustomerId:int}/groups/{GroupId:int}/edit"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject CustomerService Customers
+@inject CustomerGroupService Groups
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "New priority group" : "Edit priority group")</PageTitle>
+
+@if (_error is not null && _model is null)
+{
+    <div class="banner banner-error">@_error</div>
+    <LinkButton Href="/admin/customers">Back to customers</LinkButton>
+}
+else if (_model is null || _customer is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    <div class="page-header">
+        <h1>@(IsNew ? "New priority group" : "Edit priority group")</h1>
+    </div>
+    <p>Customer: <strong>@_customer.Name</strong></p>
+
+    <div class="banner banner-info form-panel">
+        This is a <strong>destination</strong> group that receives forwarded messages. Do not enter the customer's own support group here.
+    </div>
+
+    <div class="panel form-panel">
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="form-row">
+                <label>Group name</label>
+                <TelerikTextBox @bind-Value="_model.Name" Width="100%" />
+                <ValidationMessage For="() => _model.Name" />
+            </div>
+            <div class="form-row">
+                <label>Bale group (chat) ID</label>
+                <TelerikNumericTextBox @bind-Value="_model.BaleId" Format="0" Decimals="0" Arrows="false" Width="100%" />
+                <div class="hint">Numeric chat id of the destination group; the bot must be a member. Must be unique.</div>
+                <ValidationMessage For="() => _model.BaleId" />
+            </div>
+            <div class="form-row">
+                <label>Priority</label>
+                <TelerikDropDownList Data="_options" TextField="@nameof(PriorityOption.Text)" ValueField="@nameof(PriorityOption.Value)"
+                                     @bind-Value="_model.Priority" Width="100%" />
+                <ValidationMessage For="() => _model.Priority" />
+            </div>
+
+            <StatusBanner Message="@ErrorText" IsError="true" />
+
+            <div class="form-actions">
+                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">Save</TelerikButton>
+                <LinkButton Href="@($"/admin/customers/{CustomerId}")">Cancel</LinkButton>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@code {
+    private sealed record PriorityOption(GroupPriority Value, string Text);
+
+    private static readonly List<PriorityOption> _options =
+        PriorityHelper.Ordered.Select(p => new PriorityOption(p, p.ToString())).ToList();
+
+    [Parameter] public int CustomerId { get; set; }
+
+    [Parameter] public int? GroupId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "priority")] public string? PriorityQuery { get; set; }
+
+    private CustomerDto? _customer;
+    private GroupInput? _model;
+    private List<string> _errors = new();
+    private string? _error;
+    private bool _saving;
+
+    private string ErrorText => string.Join(" ", _errors);
+
+    private bool IsNew => GroupId is null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _errors.Clear();
+        _error = null;
+        _customer = await Customers.GetAsync(CustomerId);
+        if (_customer is null)
+        {
+            _model = null;
+            _error = "The customer does not exist.";
+            return;
+        }
+
+        if (IsNew)
+        {
+            _model = new GroupInput();
+
+            // Pre-select the priority requested from the details page, otherwise the first one still free.
+            if (PriorityHelper.TryParse(PriorityQuery, out var requested))
+            {
+                _model.Priority = requested;
+            }
+            else
+            {
+                var status = await Groups.GetPriorityStatusAsync(CustomerId);
+                var free = status.FirstOrDefault(s => !s.IsConfigured);
+                if (free is not null)
+                    _model.Priority = free.Priority;
+            }
+
+            return;
+        }
+
+        var group = await Groups.GetAsync(GroupId!.Value);
+
+        // The group must belong to the customer in the URL.
+        if (group is null || group.CustomerId != CustomerId)
+        {
+            _model = null;
+            _error = "The group does not exist for this customer.";
+            return;
+        }
+
+        _model = new GroupInput { Name = group.Name, BaleId = group.BaleId, Priority = group.Priority };
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            var result = IsNew
+                ? await Groups.CreateAsync(CustomerId, _model!)
+                : await Groups.UpdateAsync(GroupId!.Value, _model!);
+
+            if (!result.Succeeded)
+            {
+                _errors = result.Errors.ToList();
+                return;
+            }
+
+            Navigation.NavigateTo($"/admin/customers/{CustomerId}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

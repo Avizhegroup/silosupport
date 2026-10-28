@@ -1,0 +1,137 @@
+@page "/admin/customers/{CustomerId:int}/members/new"
+@page "/admin/customers/{CustomerId:int}/members/{MemberId:int}/edit"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject CustomerService Customers
+@inject CustomerMemberService Members
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "New member" : "Edit member")</PageTitle>
+
+@if (_error is not null && _model is null)
+{
+    <div class="banner banner-error">@_error</div>
+    <LinkButton Href="/admin/customers">Back to customers</LinkButton>
+}
+else if (_model is null || _customer is null)
+{
+    <p class="muted">Loading…</p>
+}
+else
+{
+    <div class="page-header">
+        <h1>@(IsNew ? "New member" : "Edit member")</h1>
+    </div>
+    <p>Customer: <strong>@_customer.Name</strong></p>
+
+    <div class="panel form-panel">
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="form-row">
+                <label>Name</label>
+                <TelerikTextBox @bind-Value="_model.Name" Width="100%" />
+                <ValidationMessage For="() => _model.Name" />
+            </div>
+            <div class="form-row">
+                <label>Phone number</label>
+                <TelerikTextBox @bind-Value="_model.PhoneNumber" Width="100%" />
+                <ValidationMessage For="() => _model.PhoneNumber" />
+            </div>
+            <div class="form-row">
+                <label>Bale ID (numeric user id)</label>
+                <TelerikNumericTextBox @bind-Value="_model.BaleId" Format="0" Decimals="0" Arrows="false" Width="100%" />
+                <div class="hint">The sender id Bale reports for this person. It must be unique across all members.</div>
+                <ValidationMessage For="() => _model.BaleId" />
+            </div>
+            <div class="form-row">
+                <label>Description</label>
+                <TelerikTextArea @bind-Value="_model.Description" Width="100%" />
+                <ValidationMessage For="() => _model.Description" />
+            </div>
+
+            <StatusBanner Message="@ErrorText" IsError="true" />
+
+            <div class="form-actions">
+                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">Save</TelerikButton>
+                <LinkButton Href="@($"/admin/customers/{CustomerId}")">Cancel</LinkButton>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@code {
+    [Parameter] public int CustomerId { get; set; }
+
+    [Parameter] public int? MemberId { get; set; }
+
+    private CustomerDto? _customer;
+    private MemberInput? _model;
+    private List<string> _errors = new();
+    private string? _error;
+    private bool _saving;
+
+    private string ErrorText => string.Join(" ", _errors);
+
+    private bool IsNew => MemberId is null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _errors.Clear();
+        _error = null;
+        _customer = await Customers.GetAsync(CustomerId);
+        if (_customer is null)
+        {
+            _model = null;
+            _error = "The customer does not exist.";
+            return;
+        }
+
+        if (IsNew)
+        {
+            _model = new MemberInput();
+            return;
+        }
+
+        var member = await Members.GetAsync(MemberId!.Value);
+
+        // The member must belong to the customer in the URL.
+        if (member is null || member.CustomerId != CustomerId)
+        {
+            _model = null;
+            _error = "The member does not exist for this customer.";
+            return;
+        }
+
+        _model = new MemberInput
+        {
+            Name = member.Name,
+            Description = member.Description,
+            PhoneNumber = member.PhoneNumber,
+            BaleId = member.BaleId
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            var result = IsNew
+                ? await Members.CreateAsync(CustomerId, _model!)
+                : await Members.UpdateAsync(MemberId!.Value, _model!);
+
+            if (!result.Succeeded)
+            {
+                _errors = result.Errors.ToList();
+                return;
+            }
+
+            Navigation.NavigateTo($"/admin/customers/{CustomerId}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
