@@ -1,6 +1,6 @@
 using SiloSupport.Domain.Enums;
 
-namespace SiloSupport.Application.Dtos;
+namespace SiloSupport.Service.CustomerSupport.Models;
 
 /// <summary>Result of asking the AI API for a priority.</summary>
 public sealed class PriorityClassificationResult

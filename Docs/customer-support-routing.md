@@ -20,22 +20,20 @@ data (customers, members, priority groups, forwarded messages); it never talks t
 | Project | Target | Responsibility |
 |---|---|---|
 | `SiloSupport.Domain` | net9.0 | `Customer`, `CustomerMember`, `CustomerGroup`, `CustomerGroupedMessage`, `GroupPriority`, `AppRoles` |
-| `SiloSupport.Application` | net9.0 | Ports (`I*Repository`, `IBaleBotClient`, `IMessagePriorityClassifier`, `ITransactionRunner`), services, DTOs, pure helpers |
-| `SiloSupport.Infrastructure` | net9.0 | `BaleBotApiClient`, `SiloAiPriorityClassifier`, `BaleBotOptions` (+ the existing `SiloAiClient`) |
+| `SiloSupport.Application` | net9.0 | Admin-side ports (`I*Repository`, `ITransactionRunner`), the four admin services, DTOs, `PriorityHelper`. **No Bale / AI / message-processing code** |
+| `SiloSupport.Infrastructure` | net9.0 | Only the existing `SiloAiClient` (unchanged) |
 | `SiloSupport.Persistence` | net9.0 | `ApplicationDbContext` (Identity + domain), EF configurations, repositories, `EfTransactionRunner`, migrations, `AddSupportPersistence` |
-| `SiloSupport.Service.CustomerSupport` | net9.0 | **New Windows service**: Bale long-polling worker, composition of the Bale/AI adapters and the message processor |
+| `SiloSupport.Service.CustomerSupport` | net9.0 | **New Windows service** and the only home of the bot: `BaleUpdatesWorker`, `CustomerMessageProcessor`, `IBaleBotClient`/`BaleBotApiClient`, `IMessagePriorityClassifier`/`SiloAiPriorityClassifier`, AI result parser, prompt, formatter, `BaleBotOptions` |
 | `SiloSupport.Web` | net9.0 | Blazor Web App (Interactive Server + **Telerik UI for Blazor**), Identity login, admin pages. References Application + Persistence only |
 | `SiloSupport.Tests` | net9.0 | xUnit + SQLite in-memory for Application / Persistence / Infrastructure. **No Web tests** |
 
 Everything targets **net9.0** (set once in `Directory.build.props`), with EF Core and Identity at the same version as the
 rest of the solution (`$(AspNetCoreVersion)`). `SiloSupport.Service.CustomerChat` is **unchanged**;
-`SiloSupport.Application.csproj` gained a Domain reference and a `Microsoft.Extensions.Logging.Abstractions` reference,
-but no source file of the existing service changed.
+`SiloSupport.Application.csproj` gained a Domain reference, but no source file of the existing service changed.
 
 The Web project contains **no** Bale, AI or message-processing code: no worker, no `CustomerMessageProcessor`, no Bale/AI
 options or HTTP clients. It registers only the four admin services it needs. All message handling lives in
-`SiloSupport.Service.CustomerSupport` (using the ports and the processor from Application and the adapters from
-Infrastructure).
+`SiloSupport.Service.CustomerSupport`; Web does not reference it.
 
 ## Processing flow (`CustomerMessageProcessor`, run by the Windows service)
 

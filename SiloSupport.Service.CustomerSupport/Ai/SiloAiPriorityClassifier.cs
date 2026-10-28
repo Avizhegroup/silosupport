@@ -4,7 +4,7 @@ using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Helpers;
 using SiloSupport.Application.Interfaces;
 
-namespace SiloSupport.Infrastructure.Ai;
+namespace SiloSupport.Service.CustomerSupport.Ai;
 
 /// <summary>
 /// Classifies a customer message with the existing Silo AI RAG chat API (<see cref="ISiloAiClient"/>, POST

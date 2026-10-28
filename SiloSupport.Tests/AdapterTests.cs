@@ -5,9 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SiloSupport.Application;
 using SiloSupport.Domain.Enums;
-using SiloSupport.Infrastructure.Ai;
-using SiloSupport.Infrastructure.Bale;
-using SiloSupport.Infrastructure.Options;
 
 namespace SiloSupport.Tests;
 

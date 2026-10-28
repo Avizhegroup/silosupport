@@ -1,4 +1,4 @@
-namespace SiloSupport.Infrastructure.Options;
+namespace SiloSupport.Service.CustomerSupport.Options;
 
 /// <summary>Settings of the Bale bot used by the support routing feature (section "Bale").</summary>
 public class BaleBotOptions

@@ -23,6 +23,7 @@
     <ProjectReference Include="..\SiloSupport.Application\SiloSupport.Application.csproj" />
     <ProjectReference Include="..\SiloSupport.Persistence\SiloSupport.Persistence.csproj" />
     <ProjectReference Include="..\SiloSupport.Infrastructure\SiloSupport.Infrastructure.csproj" />
+    <ProjectReference Include="..\SiloSupport.Service.CustomerSupport\SiloSupport.Service.CustomerSupport.csproj" />
   </ItemGroup>
 
 </Project>

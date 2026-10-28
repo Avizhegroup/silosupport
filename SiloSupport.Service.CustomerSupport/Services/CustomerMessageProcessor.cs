@@ -4,7 +4,7 @@ using SiloSupport.Application.Helpers;
 using SiloSupport.Application.Interfaces;
 using SiloSupport.Domain.Entities;
 
-namespace SiloSupport.Application.Services;
+namespace SiloSupport.Service.CustomerSupport.Services;
 
 /// <summary>
 /// Processes one incoming Bale message: filters it, identifies the customer member, asks the AI API for a

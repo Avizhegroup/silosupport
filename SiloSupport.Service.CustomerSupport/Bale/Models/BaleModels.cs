@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace SiloSupport.Infrastructure.Bale.Models;
+namespace SiloSupport.Service.CustomerSupport.Bale.Models;
 
 /// <summary>Wrapper returned by every Bale Bot API call (documented fields: ok, result, description, error_code).</summary>
 public class BaleApiResponse<T>
