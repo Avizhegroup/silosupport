@@ -102,6 +102,3 @@ app.Run();
 
 static string BuildLoginUrl(string returnUrl, string error) =>
     $"/Account/Login?returnUrl={Uri.EscapeDataString(returnUrl)}&error={Uri.EscapeDataString(error)}";
-
-/// <summary>Enables <c>WebApplicationFactory&lt;Program&gt;</c> in tests.</summary>
-public partial class Program { }

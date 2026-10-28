@@ -2,7 +2,6 @@ using Microsoft.Extensions.Options;
 using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Interfaces;
 using SiloSupport.Application.Services;
-using SiloSupport.Infrastructure.Options;
 
 namespace SiloSupport.Service.CustomerSupport.Workers;
 

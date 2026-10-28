@@ -1,4 +1,4 @@
-namespace SiloSupport.Application.Helpers;
+namespace SiloSupport.Service.CustomerSupport.Helpers;
 
 /// <summary>
 /// Builds the text sent to the existing Silo AI chat endpoint. The documented API only returns free text,

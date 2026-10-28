@@ -20,17 +20,20 @@ data (customers, members, priority groups, forwarded messages); it never talks t
 | Project | Target | Responsibility |
 |---|---|---|
 | `SiloSupport.Domain` | net9.0 | `Customer`, `CustomerMember`, `CustomerGroup`, `CustomerGroupedMessage`, `GroupPriority`, `AppRoles` |
-| `SiloSupport.Application` | net9.0 | Ports (`I*Repository`, `IBaleBotClient`, `IMessagePriorityClassifier`, `ITransactionRunner`), services, DTOs, pure helpers |
-| `SiloSupport.Infrastructure` | net9.0 | `BaleBotApiClient`, `SiloAiPriorityClassifier`, `BaleBotOptions` (+ the existing `SiloAiClient`) |
-| `SiloSupport.Persistence` | net10.0 | `ApplicationDbContext` (Identity + domain), EF configurations, repositories, `EfTransactionRunner`, migrations, `AddSupportPersistence` |
-| `SiloSupport.Service.CustomerSupport` | net10.0 | **New Windows service**: Bale long-polling worker, composition of the Bale/AI adapters and the message processor |
-| `SiloSupport.Web` | net10.0 | Blazor Web App (Interactive Server + **Telerik UI for Blazor**), Identity login, admin pages. References Application + Persistence only |
-| `SiloSupport.Tests` | net10.0 | xUnit + SQLite in-memory for Application / Persistence / Infrastructure. **No Web tests** |
+| `SiloSupport.Application` | net9.0 | Admin-side ports (`I*Repository`, `ITransactionRunner`), the four admin services, DTOs, `PriorityHelper`. **No Bale / AI / message-processing code** |
+| `SiloSupport.Infrastructure` | net9.0 | Only the existing `SiloAiClient` (unchanged) |
+| `SiloSupport.Persistence` | net9.0 | `ApplicationDbContext` (Identity + domain), EF configurations, repositories, `EfTransactionRunner`, migrations, `AddSupportPersistence` |
+| `SiloSupport.Service.CustomerSupport` | net9.0 | **New Windows service** and the only home of the bot: `BaleUpdatesWorker`, `CustomerMessageProcessor`, `IBaleBotClient`/`BaleBotApiClient`, `IMessagePriorityClassifier`/`SiloAiPriorityClassifier`, AI result parser, prompt, formatter, `BaleBotOptions` |
+| `SiloSupport.Web` | net9.0 | Blazor Web App (Interactive Server + **Telerik UI for Blazor**), Identity login, admin pages. References Application + Persistence only |
+| `SiloSupport.Tests` | net9.0 | xUnit + SQLite in-memory for Application / Persistence / Infrastructure. **No Web tests** |
 
-`SiloSupport.Service.CustomerChat` is **unchanged**. Domain/Application/Infrastructure stay on net9.0 because that
-service (net9.0) references Application and Infrastructure; a net9.0 project cannot reference net10.0 projects.
-`SiloSupport.Application.csproj` gained a Domain reference and a `Microsoft.Extensions.Logging.Abstractions` reference;
-no source file of the existing service changed. The new service is net10.0 because it uses Persistence (EF Core 10).
+Everything targets **net9.0** (set once in `Directory.build.props`), with EF Core and Identity at the same version as the
+rest of the solution (`$(AspNetCoreVersion)`). `SiloSupport.Service.CustomerChat` is **unchanged**;
+`SiloSupport.Application.csproj` gained a Domain reference, but no source file of the existing service changed.
+
+The Web project contains **no** Bale, AI or message-processing code: no worker, no `CustomerMessageProcessor`, no Bale/AI
+options or HTTP clients. It registers only the four admin services it needs. All message handling lives in
+`SiloSupport.Service.CustomerSupport`; Web does not reference it.
 
 ## Processing flow (`CustomerMessageProcessor`, run by the Windows service)
 
@@ -96,27 +99,36 @@ installed on the build machine (see Telerik's licensing documentation), otherwis
 
 ## Configuration
 
-Placeholders only in the `appsettings.json` files; supply real values with user secrets or environment variables.
+All settings are plain values in the `appsettings.json` of each host (no user secrets, no environment variables).
 
-**Windows service** (`SiloSupport.Service.CustomerSupport`):
+**Windows service** (`SiloSupport.Service.CustomerSupport/appsettings.json`):
 
-```
-Database__ConnectionString=...
-Bale__BotToken=...                       # from @botfather
-SiloAI__BaseUrl=...  SiloAI__ApiKey=...
-```
-
-**Web** (`SiloSupport.Web`):
-
-```
-Database__ConnectionString=...           # same database as the service
-AdminSeed__UserName=...  AdminSeed__Password=...   # first administrator, created at startup if missing
+```json
+{
+  "Database": { "ConnectionString": "..." },
+  "Bale": { "Enabled": true, "BotToken": "<bot token from @botfather>", "ApiBaseUrl": "https://tapi.bale.ai", "LongPollTimeoutSeconds": 30 },
+  "SiloAI": { "BaseUrl": "http://localhost:5300/", "ApiKey": "<Silo AI API key>", "TopK": 5, "IsMainChat": true, "DocType": "GeneralChat", "Key": null }
+}
 ```
 
-`Bale:Enabled=false` stops the polling worker; it also does not start when no real token is configured. The Bale bot
-token is part of the Bale request URL, so `System.Net.Http.HttpClient` logging is kept at `Warning` (already set) to
-avoid writing it to logs. The service logs with Serilog to the console and to `logs/customer-support-.log` next to the
-executable.
+**Web** (`SiloSupport.Web/appsettings.json`):
+
+```json
+{
+  "Database": { "ConnectionString": "..." },
+  "AdminSeed": { "UserName": "<admin user name>", "Password": "<admin password>" }
+}
+```
+
+- `Database:ConnectionString` must point to the same database in both files.
+- `Bale:BotToken` and `SiloAI:ApiKey` are empty in the repository: fill them in before starting the service. The worker
+  does not start (it logs a warning) while `Bale:BotToken` is empty, and `Bale:Enabled=false` stops it as well.
+- `AdminSeed` creates the first administrator at startup when both values are set and the user does not exist yet; with
+  empty values no administrator is created. Choose your own credentials; no default account is shipped.
+- The Bale bot token is part of the Bale request URL, so `System.Net.Http.HttpClient` logging is kept at `Warning`
+  (already set) to avoid writing it to logs. The service logs with Serilog to the console and to
+  `logs/customer-support-.log` next to the executable.
+- Because these files hold real credentials, keep the repository private.
 
 Group chat ids: add the bot to each destination group; the chat id is the numeric `chat.id` Bale reports (usually
 negative for groups).
@@ -128,8 +140,7 @@ dotnet publish SiloSupport.Service.CustomerSupport -c Release -o C:\Services\Sil
 sc.exe create "Silo Customer Support Service" binPath= "C:\Services\SiloCustomerSupport\SiloSupport.Service.CustomerSupport.exe" start= auto
 ```
 
-Set the secrets as machine-level environment variables (or in an `appsettings.Production.json` kept out of source
-control) before starting it.
+Edit `appsettings.json` next to the published executable (connection string, bot token, AI key) before starting it.
 
 ## Migrations
 
@@ -168,4 +179,4 @@ The Blazor Web project has no tests by decision.
   message already forwarded just before a restart could therefore be forwarded twice.
 - Messages are processed concurrently (max 5), so forwarded order across messages is not guaranteed.
 - `SiloSupport.Service.CustomerChat/appsettings.json` contains what look like a real Bale bot token and AI API key.
-  That project is read-only for this task; rotate those credentials and move them to secrets.
+  That project is read-only for this task; make sure the repository stays private (or rotate those credentials).

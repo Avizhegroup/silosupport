@@ -1,6 +1,6 @@
 using SiloSupport.Application.Dtos;
 
-namespace SiloSupport.Application.Interfaces;
+namespace SiloSupport.Service.CustomerSupport.Abstractions;
 
 /// <summary>Port that asks the existing Silo AI API to classify a customer message.</summary>
 public interface IMessagePriorityClassifier

@@ -1,6 +1,6 @@
 using SiloSupport.Application.Dtos;
 
-namespace SiloSupport.Application.Interfaces;
+namespace SiloSupport.Service.CustomerSupport.Abstractions;
 
 /// <summary>Port to the Bale Bot HTTP API (getUpdates long polling, getMe, sendMessage).</summary>
 public interface IBaleBotClient

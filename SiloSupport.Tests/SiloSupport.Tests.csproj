@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -24,6 +23,7 @@
     <ProjectReference Include="..\SiloSupport.Application\SiloSupport.Application.csproj" />
     <ProjectReference Include="..\SiloSupport.Persistence\SiloSupport.Persistence.csproj" />
     <ProjectReference Include="..\SiloSupport.Infrastructure\SiloSupport.Infrastructure.csproj" />
+    <ProjectReference Include="..\SiloSupport.Service.CustomerSupport\SiloSupport.Service.CustomerSupport.csproj" />
   </ItemGroup>
 
 </Project>

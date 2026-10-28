@@ -5,7 +5,7 @@ using SiloSupport.Persistence;
 
 namespace SiloSupport.Web.Security;
 
-/// <summary>Idempotent startup seeding: migrations, roles and the administrator (credentials come from secrets only).</summary>
+/// <summary>Idempotent startup seeding: migrations, roles and the administrator (credentials come from appsettings.json).</summary>
 public static class IdentitySeeder
 {
     public static async Task SeedAsync(IServiceProvider services, IConfiguration configuration, ILogger logger)
@@ -27,7 +27,7 @@ public static class IdentitySeeder
         {
             logger.LogWarning(
                 "AdminSeed:UserName / AdminSeed:Password are not configured; no administrator was created. " +
-                "Set them via user secrets or environment variables to create the first administrator.");
+                "Set them in appsettings.json to create the first administrator.");
             return;
         }
 

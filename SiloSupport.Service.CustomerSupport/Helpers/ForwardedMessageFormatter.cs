@@ -1,7 +1,7 @@
 using System.Text;
 using SiloSupport.Application.Dtos;
 
-namespace SiloSupport.Application.Helpers;
+namespace SiloSupport.Service.CustomerSupport.Helpers;
 
 /// <summary>
 /// Pure formatting of the text forwarded to a customer's priority group. Only data that is actually

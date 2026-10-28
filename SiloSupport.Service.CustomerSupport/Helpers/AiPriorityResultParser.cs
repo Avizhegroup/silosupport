@@ -1,7 +1,7 @@
 using System.Text.Json;
 using SiloSupport.Domain.Enums;
 
-namespace SiloSupport.Application.Helpers;
+namespace SiloSupport.Service.CustomerSupport.Helpers;
 
 /// <summary>The priority and analysis extracted from the AI response.</summary>
 public sealed record AiClassification(GroupPriority Priority, string? Analysis);

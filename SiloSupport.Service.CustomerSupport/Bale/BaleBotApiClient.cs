@@ -4,10 +4,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Interfaces;
-using SiloSupport.Infrastructure.Bale.Models;
-using SiloSupport.Infrastructure.Options;
+using SiloSupport.Service.CustomerSupport.Bale.Models;
 
-namespace SiloSupport.Infrastructure.Bale;
+namespace SiloSupport.Service.CustomerSupport.Bale;
 
 /// <summary>
 /// Bale Bot API adapter (getUpdates, getMe, sendMessage) over the named HttpClient <see cref="HttpClientName"/>.

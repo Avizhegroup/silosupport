@@ -1,4 +1,4 @@
-namespace SiloSupport.Application.Dtos;
+namespace SiloSupport.Service.CustomerSupport.Models;
 
 /// <summary>
 /// A Bale message reduced to what the routing flow needs. The Infrastructure adapter maps the Bale JSON to this.
