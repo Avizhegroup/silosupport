@@ -1,18 +1,24 @@
-html, body { margin: 0; font-family: var(--kendo-font-family, "Segoe UI", Roboto, Arial, sans-serif); }
+html, body { margin: 0; font-family: Tahoma, "Segoe UI", "Vazirmatn", Roboto, Arial, sans-serif; }
+body { background: #f4f5f7; }
 
-/* ---------- shell ---------- */
-.app-shell { min-height: 100vh; display: flex; flex-direction: column; background: #f4f5f7; }
-.app-bar { display: flex; align-items: center; gap: 24px; padding: 10px 24px; background: #1f2d3d; color: #fff; }
+/* ---------- shell (RTL: <html dir="rtl">) ---------- */
+.app-bar { gap: 12px; }
 .app-title { font-size: 1.15rem; font-weight: 600; }
-.app-nav { display: flex; gap: 8px; }
-.app-link { color: #cfd8e3; text-decoration: none; padding: 6px 12px; border-radius: 4px; }
-.app-link:hover { color: #fff; background: rgba(255, 255, 255, .1); }
-.app-link.active { color: #fff; background: rgba(255, 255, 255, .18); }
-.app-spacer { flex: 1; }
-.app-user { color: #cfd8e3; }
-.app-bar .k-button { color: #fff; border-color: rgba(255, 255, 255, .5); }
-.app-content { width: min(1280px, 100%); box-sizing: border-box; margin: 0 auto; padding: 24px; }
+.app-user { opacity: .85; }
+.k-drawer-container { min-height: calc(100vh - 56px); }
+.app-content { box-sizing: border-box; width: min(1280px, 100%); margin: 0 auto; padding: 24px; }
 .page-pad { padding: 24px; }
+.confirm-text { margin: 0; line-height: 1.8; }
+
+/* ---------- dashboard ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-tile { display: flex; flex-direction: column; gap: 6px; background: #fff; border-radius: 6px; padding: 16px; box-shadow: 0 1px 4px rgba(0, 0, 0, .1); border-inline-start: 4px solid #2e90fa; }
+.stat-tile.stat-warn { border-inline-start-color: #f79009; }
+.stat-tile.stat-ok { border-inline-start-color: #12b76a; }
+.stat-label { color: #667085; font-size: .9rem; }
+.stat-value { font-size: 1.9rem; font-weight: 700; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+.period-picker { display: flex; align-items: center; gap: 8px; }
 
 /* ---------- page parts ---------- */
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -53,6 +59,6 @@ html, body { margin: 0; font-family: var(--kendo-font-family, "Segoe UI", Roboto
 .login-card h1 { margin: 0 0 4px; font-size: 1.5rem; }
 .login-sub { margin: 0 0 20px; color: #666; }
 .login-card label { display: block; margin: 12px 0 4px; font-size: .85rem; color: #444; }
-.login-card input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #bbb; border-radius: 4px; font-size: 1rem; }
-.login-card button { width: 100%; margin-top: 20px; padding: 11px; border: 0; border-radius: 4px; background: #1976d2; color: #fff; font-size: 1rem; cursor: pointer; }
+.login-card input { width: 100%; box-sizing: border-box; padding: 10px; font-size: 1rem; }
+.login-card button { width: 100%; margin-top: 20px; padding: 11px; font-size: 1rem; }
 .login-error { margin-bottom: 8px; padding: 10px; border-radius: 4px; background: #fdecea; color: #b3261e; font-size: .9rem; }

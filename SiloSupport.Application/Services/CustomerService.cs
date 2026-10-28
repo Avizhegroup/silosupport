@@ -94,7 +94,7 @@ public class CustomerService
             new Customer { Id = id, Name = input.Name.Trim(), Description = input.Description?.Trim() ?? string.Empty },
             cancellationToken);
 
-        return updated ? OperationResult.Success() : OperationResult.Failure("The customer no longer exists.");
+        return updated ? OperationResult.Success() : OperationResult.Failure("مشتری دیگر وجود ندارد.");
     }
 
     /// <summary>
@@ -106,11 +106,11 @@ public class CustomerService
         return await _transactions.ExecuteAsync(async () =>
         {
             if (await _customers.GetByIdAsync(id, cancellationToken) is null)
-                return OperationResult.Failure("The customer no longer exists.");
+                return OperationResult.Failure("مشتری دیگر وجود ندارد.");
 
             if (await _customers.HasMessageHistoryAsync(id, cancellationToken))
                 return OperationResult.Failure(
-                    "This customer has forwarded-message history and cannot be deleted.");
+                    "این مشتری سابقه پیام‌های ارسال‌شده دارد و قابل حذف نیست.");
 
             await _customers.DeleteAsync(id, cancellationToken);
             return OperationResult.Success();

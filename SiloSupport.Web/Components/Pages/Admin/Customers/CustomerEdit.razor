@@ -4,19 +4,20 @@
 @inject CustomerService Customers
 @inject NavigationManager Navigation
 
-<PageTitle>@(IsNew ? "New customer" : "Edit customer")</PageTitle>
+<PageTitle>@(IsNew ? "مشتری جدید" : "ویرایش مشتری")</PageTitle>
 
 <div class="page-header">
-    <h1>@(IsNew ? "New customer" : "Edit customer")</h1>
+    <h1>@(IsNew ? "مشتری جدید" : "ویرایش مشتری")</h1>
 </div>
 
 @if (_notFound)
 {
-    <div class="banner banner-error">The customer does not exist.</div>
+    <div class="banner banner-error">مشتری وجود ندارد.</div>
+    <LinkButton Href="/admin/customers">بازگشت به مشتریان</LinkButton>
 }
 else if (_model is null)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">در حال بارگذاری…</p>
 }
 else
 {
@@ -25,12 +26,12 @@ else
             <DataAnnotationsValidator />
 
             <div class="form-row">
-                <label>Name</label>
+                <label>نام</label>
                 <TelerikTextBox @bind-Value="_model.Name" Width="100%" />
                 <ValidationMessage For="() => _model.Name" />
             </div>
             <div class="form-row">
-                <label>Description</label>
+                <label>توضیحات</label>
                 <TelerikTextArea @bind-Value="_model.Description" Width="100%" />
                 <ValidationMessage For="() => _model.Description" />
             </div>
@@ -38,8 +39,8 @@ else
             <StatusBanner Message="@ErrorText" IsError="true" />
 
             <div class="form-actions">
-                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">Save</TelerikButton>
-                <LinkButton Href="@CancelUrl">Cancel</LinkButton>
+                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">ذخیره</TelerikButton>
+                <LinkButton Href="@CancelUrl">انصراف</LinkButton>
             </div>
         </EditForm>
     </div>
@@ -73,6 +74,7 @@ else
         var customer = await Customers.GetAsync(Id!.Value);
         if (customer is null)
         {
+            _model = null;
             _notFound = true;
             return;
         }

@@ -5,26 +5,26 @@
 @inject CustomerGroupService Groups
 @inject NavigationManager Navigation
 
-<PageTitle>@(IsNew ? "New priority group" : "Edit priority group")</PageTitle>
+<PageTitle>@(IsNew ? "گروه اولویت جدید" : "ویرایش گروه اولویت")</PageTitle>
 
 @if (_error is not null && _model is null)
 {
     <div class="banner banner-error">@_error</div>
-    <LinkButton Href="/admin/customers">Back to customers</LinkButton>
+    <LinkButton Href="/admin/customers">بازگشت به مشتریان</LinkButton>
 }
 else if (_model is null || _customer is null)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">در حال بارگذاری…</p>
 }
 else
 {
     <div class="page-header">
-        <h1>@(IsNew ? "New priority group" : "Edit priority group")</h1>
+        <h1>@(IsNew ? "گروه اولویت جدید" : "ویرایش گروه اولویت")</h1>
     </div>
-    <p>Customer: <strong>@_customer.Name</strong></p>
+    <p>مشتری: <strong>@_customer.Name</strong></p>
 
     <div class="banner banner-info form-panel">
-        This is a <strong>destination</strong> group that receives forwarded messages. Do not enter the customer's own support group here.
+        این یک گروه <strong>مقصد</strong> است که پیام‌های ارسال‌شده را دریافت می‌کند. گروه پشتیبانی خود مشتری را اینجا وارد نکنید.
     </div>
 
     <div class="panel form-panel">
@@ -32,18 +32,20 @@ else
             <DataAnnotationsValidator />
 
             <div class="form-row">
-                <label>Group name</label>
+                <label>نام گروه</label>
                 <TelerikTextBox @bind-Value="_model.Name" Width="100%" />
                 <ValidationMessage For="() => _model.Name" />
             </div>
             <div class="form-row">
-                <label>Bale group (chat) ID</label>
-                <TelerikNumericTextBox @bind-Value="_model.BaleId" Format="0" Decimals="0" Arrows="false" Width="100%" />
-                <div class="hint">Numeric chat id of the destination group; the bot must be a member. Must be unique.</div>
+                <label>شناسه گروه (چت) بله</label>
+                <div dir="ltr">
+                    <TelerikNumericTextBox @bind-Value="_model.BaleId" Format="0" Decimals="0" Arrows="false" Width="100%" />
+                </div>
+                <div class="hint">شناسه عددی چت گروه مقصد؛ ربات باید عضو گروه باشد. باید یکتا باشد.</div>
                 <ValidationMessage For="() => _model.BaleId" />
             </div>
             <div class="form-row">
-                <label>Priority</label>
+                <label>اولویت</label>
                 <TelerikDropDownList Data="_options" TextField="@nameof(PriorityOption.Text)" ValueField="@nameof(PriorityOption.Value)"
                                      @bind-Value="_model.Priority" Width="100%" />
                 <ValidationMessage For="() => _model.Priority" />
@@ -52,8 +54,8 @@ else
             <StatusBanner Message="@ErrorText" IsError="true" />
 
             <div class="form-actions">
-                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">Save</TelerikButton>
-                <LinkButton Href="@($"/admin/customers/{CustomerId}")">Cancel</LinkButton>
+                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">ذخیره</TelerikButton>
+                <LinkButton Href="@($"/admin/customers/{CustomerId}")">انصراف</LinkButton>
             </div>
         </EditForm>
     </div>
@@ -63,7 +65,7 @@ else
     private sealed record PriorityOption(GroupPriority Value, string Text);
 
     private static readonly List<PriorityOption> _options =
-        PriorityHelper.Ordered.Select(p => new PriorityOption(p, p.ToString())).ToList();
+        PriorityHelper.Ordered.Select(p => new PriorityOption(p, PriorityHelper.DisplayName(p))).ToList();
 
     [Parameter] public int CustomerId { get; set; }
 
@@ -89,7 +91,7 @@ else
         if (_customer is null)
         {
             _model = null;
-            _error = "The customer does not exist.";
+            _error = "مشتری وجود ندارد.";
             return;
         }
 
@@ -119,7 +121,7 @@ else
         if (group is null || group.CustomerId != CustomerId)
         {
             _model = null;
-            _error = "The group does not exist for this customer.";
+            _error = "این گروه برای این مشتری وجود ندارد.";
             return;
         }
 

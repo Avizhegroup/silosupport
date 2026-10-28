@@ -57,7 +57,7 @@ public class CustomerGroupService
         return await _transactions.ExecuteAsync(async () =>
         {
             if (await _customers.GetByIdAsync(customerId, cancellationToken) is null)
-                return OperationResult<int>.Failure("The customer no longer exists.");
+                return OperationResult<int>.Failure("مشتری دیگر وجود ندارد.");
 
             var conflict = await FindConflictAsync(customerId, input, null, cancellationToken);
             if (conflict is not null)
@@ -86,7 +86,7 @@ public class CustomerGroupService
         {
             var existing = await _groups.GetByIdAsync(id, cancellationToken);
             if (existing is null)
-                return OperationResult.Failure("The group no longer exists.");
+                return OperationResult.Failure("گروه دیگر وجود ندارد.");
 
             var conflict = await FindConflictAsync(existing.CustomerId, input, id, cancellationToken);
             if (conflict is not null)
@@ -96,7 +96,7 @@ public class CustomerGroupService
                 new CustomerGroup { Id = id, Name = input.Name.Trim(), BaleId = input.BaleId, Priority = input.Priority },
                 cancellationToken);
 
-            return updated ? OperationResult.Success() : OperationResult.Failure("The group no longer exists.");
+            return updated ? OperationResult.Success() : OperationResult.Failure("گروه دیگر وجود ندارد.");
         });
     }
 
@@ -106,10 +106,10 @@ public class CustomerGroupService
         return await _transactions.ExecuteAsync(async () =>
         {
             if (await _groups.GetByIdAsync(id, cancellationToken) is null)
-                return OperationResult.Failure("The group no longer exists.");
+                return OperationResult.Failure("گروه دیگر وجود ندارد.");
 
             if (await _groups.HasMessagesAsync(id, cancellationToken))
-                return OperationResult.Failure("This group has forwarded-message history and cannot be deleted.");
+                return OperationResult.Failure("این گروه سابقه پیام‌های ارسال‌شده دارد و قابل حذف نیست.");
 
             await _groups.DeleteAsync(id, cancellationToken);
             return OperationResult.Success();
@@ -119,10 +119,10 @@ public class CustomerGroupService
     private async Task<string?> FindConflictAsync(int customerId, GroupInput input, int? excludeGroupId, CancellationToken cancellationToken)
     {
         if (await _groups.PriorityTakenAsync(customerId, input.Priority, excludeGroupId, cancellationToken))
-            return $"This customer already has a {input.Priority} priority group.";
+            return $"این مشتری از قبل یک گروه با اولویت «{PriorityHelper.DisplayName(input.Priority)}» دارد.";
 
         if (await _groups.BaleIdExistsAsync(input.BaleId, excludeGroupId, cancellationToken))
-            return "Another priority group already uses this Bale group ID.";
+            return "گروه دیگری از همین شناسه گروه بله استفاده می‌کند.";
 
         return null;
     }

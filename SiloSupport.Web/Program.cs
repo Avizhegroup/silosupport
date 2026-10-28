@@ -2,8 +2,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SiloSupport.Application.Services;
 using SiloSupport.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using SiloSupport.Web.Components;
+using SiloSupport.Web.Localization;
 using SiloSupport.Web.Security;
+using Telerik.Blazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,12 +46,21 @@ builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<CustomerMemberService>();
 builder.Services.AddScoped<CustomerGroupService>();
 builder.Services.AddScoped<ConversationService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<DashboardService>();
 
 // 4. Blazor + Telerik UI for Blazor.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Application level: every endpoint requires a signed-in user unless it is explicitly [AllowAnonymous]
+    // (the login / access-denied pages and the login and logout endpoints). Role level: the admin pages and the
+    // sidebar additionally require the Administrator role.
+    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+});
 builder.Services.AddTelerikBlazor();
+builder.Services.AddSingleton(typeof(ITelerikStringLocalizer), typeof(TelerikPersianLocalizer));
 
 var app = builder.Build();
 
@@ -79,14 +91,14 @@ app.MapPost("/Account/LoginPost", async (
     var safeReturnUrl = ReturnUrlHelper.Resolve(returnUrl);
 
     if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
-        return Results.Redirect(BuildLoginUrl(safeReturnUrl, "Username and password are required."));
+        return Results.Redirect(BuildLoginUrl(safeReturnUrl, "نام کاربری و رمز عبور الزامی است."));
 
     var result = await signInManager.PasswordSignInAsync(username, password, isPersistent: false, lockoutOnFailure: true);
     return result.Succeeded
         ? Results.LocalRedirect(safeReturnUrl)
         : Results.Redirect(BuildLoginUrl(safeReturnUrl, result.IsLockedOut
-            ? "Account temporarily locked. Try again later."
-            : "Invalid username or password."));
+            ? "حساب کاربری موقتاً قفل شده است. بعداً دوباره تلاش کنید."
+            : "نام کاربری یا رمز عبور نادرست است."));
 }).AllowAnonymous();
 
 app.MapGet("/Account/LogoutPost", async (HttpContext http, SignInManager<ApplicationUser> signInManager) =>

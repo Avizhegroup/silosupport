@@ -1,14 +1,18 @@
-<a class="@CssClass" href="@Href">@ChildContent</a>
+@inject NavigationManager Navigation
+
+<TelerikButton OnClick="Go"
+               ThemeColor="@(Primary ? ThemeConstants.Button.ThemeColor.Primary : ThemeConstants.Button.ThemeColor.Base)"
+               FillMode="@(Primary ? ThemeConstants.Button.FillMode.Solid : ThemeConstants.Button.FillMode.Outline)">
+    @ChildContent
+</TelerikButton>
 
 @code {
     [Parameter, EditorRequired] public string Href { get; set; } = "/";
 
-    /// <summary>Primary (filled) or secondary (outlined) look, using the Telerik theme classes.</summary>
+    /// <summary>Primary (filled) or secondary (outlined) look.</summary>
     [Parameter] public bool Primary { get; set; }
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    private string CssClass => Primary
-        ? "k-button k-button-md k-rounded-md k-button-solid k-button-solid-primary"
-        : "k-button k-button-md k-rounded-md k-button-outline k-button-outline-base";
+    private void Go() => Navigation.NavigateTo(Href);
 }

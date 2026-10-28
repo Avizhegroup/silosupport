@@ -42,6 +42,30 @@ public class CustomerGroupedMessageRepository : ICustomerGroupedMessageRepositor
             .ToList();
     }
 
+    public async Task<IReadOnlyList<MessageCountRow>> GetCountsAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.CustomerGroupedMessages
+            .AsNoTracking()
+            .GroupBy(m => new { m.Group!.CustomerId, m.Group.Priority, m.IsResolved })
+            .Select(g => new { g.Key.CustomerId, g.Key.Priority, g.Key.IsResolved, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(r => new MessageCountRow(r.CustomerId, r.Priority, r.IsResolved, r.Count)).ToList();
+    }
+
+    public async Task<IReadOnlyList<MessageTimeRow>> GetSinceAsync(DateTime sinceUtc, CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.CustomerGroupedMessages
+            .AsNoTracking()
+            .Where(m => m.CreatedAtUtc >= sinceUtc)
+            .Select(m => new { m.CreatedAtUtc, m.Group!.Priority })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new MessageTimeRow(DateTime.SpecifyKind(r.CreatedAtUtc, DateTimeKind.Utc), r.Priority))
+            .ToList();
+    }
+
     public async Task<bool> SetResolvedAsync(int customerId, int messageId, bool isResolved, CancellationToken cancellationToken = default)
     {
         var message = await _db.CustomerGroupedMessages

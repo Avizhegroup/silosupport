@@ -3,11 +3,12 @@
 @attribute [AllowAnonymous]
 @attribute [ExcludeFromInteractiveRouting]
 
-<PageTitle>Sign in</PageTitle>
+<PageTitle>ورود</PageTitle>
 
+@* Static server rendering: the form posts to /Account/LoginPost, so native inputs styled with the Telerik theme classes are used here. *@
 <div class="login-card">
-    <h1>Silo Support</h1>
-    <p class="login-sub">Administrator sign in</p>
+    <h1>پشتیبانی سیلو</h1>
+    <p class="login-sub">ورود مدیر سیستم</p>
 
     @if (!string.IsNullOrWhiteSpace(Error))
     {
@@ -18,13 +19,13 @@
         <AntiforgeryToken />
         <input type="hidden" name="returnUrl" value="@SafeReturnUrl" />
 
-        <label for="username">Username</label>
-        <input id="username" name="username" type="text" autocomplete="username" required />
+        <label for="username">نام کاربری</label>
+        <input id="username" name="username" type="text" class="k-input k-input-md k-rounded-md k-input-solid" autocomplete="username" required />
 
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <label for="password">رمز عبور</label>
+        <input id="password" name="password" type="password" class="k-input k-input-md k-rounded-md k-input-solid" autocomplete="current-password" required />
 
-        <button type="submit">Sign in</button>
+        <button type="submit" class="k-button k-button-md k-rounded-md k-button-solid k-button-solid-primary">ورود</button>
     </form>
 </div>
 

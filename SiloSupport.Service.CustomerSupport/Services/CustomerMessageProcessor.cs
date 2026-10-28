@@ -80,7 +80,7 @@ public class CustomerMessageProcessor
             return MessageProcessingOutcome.IgnoredUnknownMember;
         }
 
-        var member = await _members.FindByBaleIdAsync(message.SenderId.Value, cancellationToken);
+        var member = await _members.FindByBaleIdAsync(message.SenderId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken);
         if (member is null)
         {
             _logger.LogInformation(

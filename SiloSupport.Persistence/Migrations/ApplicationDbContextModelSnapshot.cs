@@ -256,8 +256,10 @@ namespace SiloSupport.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<long>("BaleId")
-                        .HasColumnType("bigint");
+                    b.Property<string>("BaleId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");

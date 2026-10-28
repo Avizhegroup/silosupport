@@ -14,7 +14,7 @@ public class CustomerMemberConfiguration : IEntityTypeConfiguration<CustomerMemb
         builder.Property(m => m.Name).IsRequired().HasMaxLength(200);
         builder.Property(m => m.Description).IsRequired().HasMaxLength(1000);
         builder.Property(m => m.PhoneNumber).IsRequired().HasMaxLength(32);
-        builder.Property(m => m.BaleId).IsRequired();
+        builder.Property(m => m.BaleId).IsRequired().HasMaxLength(64);
         builder.Property(m => m.CustomerId).IsRequired();
 
         builder.HasIndex(m => m.CustomerId);

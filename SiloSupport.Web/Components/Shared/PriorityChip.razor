@@ -1,4 +1,4 @@
-<span class="chip chip-@Priority.ToString().ToLowerInvariant()">@Priority</span>
+<span class="chip chip-@Priority.ToString().ToLowerInvariant()">@PriorityHelper.DisplayName(Priority)</span>
 
 @code {
     [Parameter, EditorRequired] public GroupPriority Priority { get; set; }

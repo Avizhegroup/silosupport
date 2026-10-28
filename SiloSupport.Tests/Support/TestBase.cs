@@ -40,6 +40,7 @@ public abstract class TestBase : IDisposable
         services.AddScoped<CustomerMemberService>();
         services.AddScoped<CustomerGroupService>();
         services.AddScoped<ConversationService>();
+        services.AddScoped<DashboardService>();
 
         _provider = services.BuildServiceProvider();
         _scope = _provider.CreateScope();
@@ -73,7 +74,7 @@ public abstract class TestBase : IDisposable
         return group;
     }
 
-    protected async Task<CustomerMember> AddMemberAsync(int customerId, long baleId, string name = "Member")
+    protected async Task<CustomerMember> AddMemberAsync(int customerId, string baleId, string name = "Member")
     {
         var member = new CustomerMember { CustomerId = customerId, BaleId = baleId, Name = name, Description = "", PhoneNumber = "0912" };
         await Get<ICustomerMemberRepository>().AddAsync(member);

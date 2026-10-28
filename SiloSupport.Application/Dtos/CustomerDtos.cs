@@ -21,7 +21,7 @@ public sealed record CustomerListItemDto(
     int GroupCount,
     IReadOnlyList<GroupPriority> MissingPriorities);
 
-public sealed record MemberDto(int Id, int CustomerId, string Name, string Description, string PhoneNumber, long BaleId);
+public sealed record MemberDto(int Id, int CustomerId, string Name, string Description, string PhoneNumber, string BaleId);
 
 public sealed record GroupDto(int Id, int CustomerId, string Name, long BaleId, GroupPriority Priority);
 

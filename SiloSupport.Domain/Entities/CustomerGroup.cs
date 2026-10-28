@@ -12,7 +12,7 @@ public class CustomerGroup
 
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Bale chat/group id (64-bit, see <see cref="CustomerMember.BaleId"/>).</summary>
+    /// <summary>Bale chat/group id (64-bit integer).</summary>
     public long BaleId { get; set; }
 
     public int CustomerId { get; set; }

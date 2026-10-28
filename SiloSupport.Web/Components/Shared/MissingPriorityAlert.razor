@@ -1,9 +1,8 @@
 @if (Missing.Count > 0)
 {
     <div class="banner banner-warning" role="alert">
-        Missing priority group@(Missing.Count > 1 ? "s" : ""): <strong>@string.Join(", ", Missing)</strong>.
-        Messages classified with @(Missing.Count > 1 ? "these priorities" : "this priority") cannot be forwarded until
-        @(Missing.Count > 1 ? "they are" : "it is") configured.
+        گروه اولویت تنظیم‌نشده: <strong>@string.Join("، ", Missing.Select(PriorityHelper.DisplayName))</strong>.
+        تا زمانی که این گروه‌ها تنظیم نشوند، پیام‌هایی که با این اولویت طبقه‌بندی می‌شوند ارسال نخواهند شد.
     </div>
 }
 

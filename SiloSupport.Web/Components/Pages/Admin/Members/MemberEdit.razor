@@ -5,46 +5,48 @@
 @inject CustomerMemberService Members
 @inject NavigationManager Navigation
 
-<PageTitle>@(IsNew ? "New member" : "Edit member")</PageTitle>
+<PageTitle>@(IsNew ? "عضو جدید" : "ویرایش عضو")</PageTitle>
 
 @if (_error is not null && _model is null)
 {
     <div class="banner banner-error">@_error</div>
-    <LinkButton Href="/admin/customers">Back to customers</LinkButton>
+    <LinkButton Href="/admin/customers">بازگشت به مشتریان</LinkButton>
 }
 else if (_model is null || _customer is null)
 {
-    <p class="muted">Loading…</p>
+    <p class="muted">در حال بارگذاری…</p>
 }
 else
 {
     <div class="page-header">
-        <h1>@(IsNew ? "New member" : "Edit member")</h1>
+        <h1>@(IsNew ? "عضو جدید" : "ویرایش عضو")</h1>
     </div>
-    <p>Customer: <strong>@_customer.Name</strong></p>
+    <p>مشتری: <strong>@_customer.Name</strong></p>
 
     <div class="panel form-panel">
         <EditForm Model="_model" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
 
             <div class="form-row">
-                <label>Name</label>
+                <label>نام</label>
                 <TelerikTextBox @bind-Value="_model.Name" Width="100%" />
                 <ValidationMessage For="() => _model.Name" />
             </div>
             <div class="form-row">
-                <label>Phone number</label>
+                <label>شماره تلفن</label>
                 <TelerikTextBox @bind-Value="_model.PhoneNumber" Width="100%" />
                 <ValidationMessage For="() => _model.PhoneNumber" />
             </div>
             <div class="form-row">
-                <label>Bale ID (numeric user id)</label>
-                <TelerikNumericTextBox @bind-Value="_model.BaleId" Format="0" Decimals="0" Arrows="false" Width="100%" />
-                <div class="hint">The sender id Bale reports for this person. It must be unique across all members.</div>
+                <label>شناسه بله</label>
+                <div dir="ltr">
+                    <TelerikTextBox @bind-Value="_model.BaleId" Width="100%" />
+                </div>
+                <div class="hint">شناسه‌ای که بله برای این شخص به‌عنوان فرستنده گزارش می‌کند. در میان همه اعضا باید یکتا باشد.</div>
                 <ValidationMessage For="() => _model.BaleId" />
             </div>
             <div class="form-row">
-                <label>Description</label>
+                <label>توضیحات</label>
                 <TelerikTextArea @bind-Value="_model.Description" Width="100%" />
                 <ValidationMessage For="() => _model.Description" />
             </div>
@@ -52,8 +54,8 @@ else
             <StatusBanner Message="@ErrorText" IsError="true" />
 
             <div class="form-actions">
-                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">Save</TelerikButton>
-                <LinkButton Href="@($"/admin/customers/{CustomerId}")">Cancel</LinkButton>
+                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">ذخیره</TelerikButton>
+                <LinkButton Href="@($"/admin/customers/{CustomerId}")">انصراف</LinkButton>
             </div>
         </EditForm>
     </div>
@@ -82,7 +84,7 @@ else
         if (_customer is null)
         {
             _model = null;
-            _error = "The customer does not exist.";
+            _error = "مشتری وجود ندارد.";
             return;
         }
 
@@ -98,7 +100,7 @@ else
         if (member is null || member.CustomerId != CustomerId)
         {
             _model = null;
-            _error = "The member does not exist for this customer.";
+            _error = "این عضو برای این مشتری وجود ندارد.";
             return;
         }
 

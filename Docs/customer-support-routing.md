@@ -70,7 +70,8 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 
 ## Data model and constraints
 
-- `CustomerMember.BaleId`, `CustomerGroup.BaleId`: `long` (Bale ids can exceed 32 bits, up to 52 significant bits).
+- `CustomerMember.BaleId`: **text** (`nvarchar(64)`, trimmed). The numeric sender id of an incoming Bale message is compared with it as its invariant decimal string, so a member registered with `123456789` matches sender `123456789`.
+- `CustomerGroup.BaleId`: `long` (chat ids can exceed 32 bits, up to 52 significant bits).
 - Unique: `CustomerMembers.BaleId`; `CustomerGroups.BaleId`; `CustomerGroups(CustomerId, Priority)`.
 - `CustomerGroups.Priority` is stored as text (`Low`/`Medium`/`Critical`).
 - `CustomerGroupedMessages.GroupId → CustomerGroups` is `Restrict`: groups and customers with history cannot be
@@ -78,10 +79,11 @@ behind `IMessagePriorityClassifier`); nothing else changes.
   history are removed together with their customer.
 - Business uniqueness is enforced by the services (friendly messages) **and** by the database.
 
-## Admin UI (`SiloSupport.Web`, Telerik UI for Blazor, `[Authorize(Roles = "Administrator")]`)
+## Admin UI (`SiloSupport.Web`, Telerik UI for Blazor, Persian / RTL, `[Authorize(Roles = "Administrator")]`)
 
 | Route | Page |
 |---|---|
+| `/` | **dashboard**: totals, donut chart per priority, columns per customer (top 10), daily line chart (7/30/90 days, Jalali dates), per-customer table |
 | `/admin/customers` | list (member count, missing priority groups), delete |
 | `/admin/customers/new`, `/{id}/edit` | create / edit |
 | `/admin/customers/{id}` | details: members, the three priority slots, missing-group warning |
@@ -90,8 +92,37 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 | `/admin/conversations[/{customerId}]` | forwarded messages of one customer, per group, oldest first, resolve switch |
 
 The pages only use Application services. The conversations page loads one customer's messages with a database filter.
-Telerik components used: `TelerikRootComponent`, `TelerikGrid`, `TelerikTextBox`, `TelerikTextArea`,
-`TelerikNumericTextBox`, `TelerikDropDownList`, `TelerikSwitch`, `TelerikButton`, `DialogFactory` (confirmations).
+Telerik components used: `TelerikRootComponent`, `TelerikAppBar`, `TelerikDrawer` (sidebar), `TelerikChart`,
+`TelerikGrid`, `TelerikTextBox`, `TelerikTextArea`, `TelerikNumericTextBox`, `TelerikDropDownList`, `TelerikSwitch`,
+`TelerikButton`, `TelerikDialog` (delete confirmations, `ConfirmDialog.razor`). The login and access-denied pages are
+static server-rendered pages (they post a form), so they use plain inputs styled with the Telerik theme classes.
+
+### Persian / RTL
+
+- `App.razor` renders `<html lang="fa" dir="rtl">`; the Telerik theme and layout mirror automatically. Charts and the
+  Bale-id / group-id inputs sit in `dir="ltr"` containers so numbers and axes are not mirrored.
+- All page texts, validation messages and service messages are Persian. Priorities are shown as کم / متوسط / بحرانی
+  (`PriorityHelper.DisplayName`); the stored values stay `Low` / `Medium` / `Critical`.
+- Timestamps are shown in Iran time (UTC+03:30) with the Jalali calendar (`PersianDateFormatter`).
+- Telerik's own built-in strings come from `Localization/TelerikPersianLocalizer.cs` (registered as
+  `ITelerikStringLocalizer`); keys it does not list keep Telerik's default.
+- The forwarded text sent to the Bale priority groups is unchanged (it is not part of the admin UI).
+
+### Sidebar and authorization
+
+- The sidebar (`TelerikDrawer` in `MainLayout.razor`) is rendered only inside `AuthorizeView Roles="Administrator"`:
+  Dashboard (`/`), Customers, Conversations.
+- Application level: a fallback authorization policy requires an authenticated user for every endpoint that is not
+  explicitly `[AllowAnonymous]` (login / access denied pages, login and logout endpoints).
+- Role level: every admin page, including the dashboard, has `[Authorize(Roles = "Administrator")]`; users without the
+  role are redirected to the access-denied page.
+
+### Dashboard data
+
+`DashboardService` reads the forwarded-message history (`CustomerGroupedMessages` joined to their group and customer):
+all-time counts per customer / priority / resolution state are aggregated in the database; the daily series loads only
+the creation time and priority of messages inside the selected window and buckets them per Iran-local day. Customers
+without messages are listed with zeros.
 
 Telerik UI for Blazor is a commercial product: `Telerik.UI.for.Blazor` (version pinned in `Directory.Packages.props`)
 must be restorable from your Telerik feed / local package folder in `NuGet.Config`, and a Telerik license key must be
@@ -147,8 +178,14 @@ Edit `appsettings.json` next to the published executable (connection string, bot
 The **Web project owns and applies the migrations** at startup (`Database.MigrateAsync()`); the Windows service never
 migrates, so start the Web site (or run `dotnet ef database update`) before the service.
 
-`SiloSupport.Persistence/Migrations/20261027090000_InitialCreate` (Identity + support tables) was written by hand together
-with its model snapshot because it was authored in an environment without the .NET SDK. Before relying on it, from the
+Migrations (both written by hand together with the model snapshot):
+
+1. `20261027090000_InitialCreate` – Identity + support tables.
+2. `20261028100000_MemberBaleIdAsString` – `CustomerMembers.BaleId` from `bigint` to `nvarchar(64)`; existing numeric ids are
+   converted to their text, the unique index is recreated. SQL Server uses `AlterColumn`; the SQLite branch (tests only)
+   replaces the column with plain SQL. `Down` converts back and fails if a member has a non-numeric id.
+
+They were written by hand because it was authored in an environment without the .NET SDK. Before relying on it, from the
 solution root run:
 
 ```
@@ -162,11 +199,11 @@ If it reports differences (for example the Identity schema version), delete the 
 dotnet ef migrations add InitialCreate -p SiloSupport.Persistence -s SiloSupport.Web
 ```
 
-`MigrationTests` applies the chain to SQLite.
+`MigrationTests` applies the chain to SQLite, including a data-conversion test (numeric id → text, unique index kept).
 
 ## Tests
 
-`dotnet test SiloSupport.slnx` — covers priority parsing, the prompt and formatter, all routing rules (fakes for
+`dotnet test SiloSupport.slnx` — covers priority parsing, the dashboard statistics (totals, per-customer, daily buckets in Iran time, window boundaries), Persian date/priority formatting, the text Bale id (validation, storage, matching a numeric sender), the prompt and formatter, all routing rules (fakes for
 repositories, Bale and the AI API), the Bale and AI adapters (stub handlers, no network), EF constraints / repositories /
 services (SQLite in-memory) including the conversation queries and the resolve flag, and the migration chain.
 The Blazor Web project has no tests by decision.

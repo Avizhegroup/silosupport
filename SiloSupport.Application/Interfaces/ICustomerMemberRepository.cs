@@ -10,10 +10,10 @@ public interface ICustomerMemberRepository
     Task<CustomerMember?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>Finds the member by Bale user id, with <see cref="CustomerMember.Customer"/> loaded.</summary>
-    Task<CustomerMember?> FindByBaleIdAsync(long baleId, CancellationToken cancellationToken = default);
+    Task<CustomerMember?> FindByBaleIdAsync(string baleId, CancellationToken cancellationToken = default);
 
     /// <summary>True when another member (ignoring <paramref name="excludeMemberId"/>) already uses the Bale id.</summary>
-    Task<bool> BaleIdExistsAsync(long baleId, int? excludeMemberId, CancellationToken cancellationToken = default);
+    Task<bool> BaleIdExistsAsync(string baleId, int? excludeMemberId, CancellationToken cancellationToken = default);
 
     Task AddAsync(CustomerMember member, CancellationToken cancellationToken = default);
 
