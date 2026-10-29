@@ -5,7 +5,10 @@
 <PageTitle>داشبورد</PageTitle>
 
 <div class="page-header">
-    <h1>داشبورد پیام‌های ارسال‌شده</h1>
+    <div>
+        <h1>داشبورد</h1>
+        <p class="page-sub">آمار پیام‌های ارسال‌شده به گروه‌های اولویت مشتریان</p>
+    </div>
     <div class="period-picker">
         <label>بازه نمودار روزانه</label>
         <TelerikDropDownList Data="_periods" TextField="@nameof(PeriodOption.Text)" ValueField="@nameof(PeriodOption.Days)"
@@ -17,32 +20,48 @@
 
 @if (_data is null && _error is null)
 {
-    <p class="muted">در حال بارگذاری…</p>
+    <div class="loading-state">در حال بارگذاری…</div>
 }
 else if (_data is not null)
 {
     <div class="stat-grid">
         <div class="stat-tile">
-            <span class="stat-label">مشتریان</span>
-            <span class="stat-value">@_data.CustomerCount</span>
+            <span class="stat-icon"><TelerikSvgIcon Icon="@SvgIcon.User" /></span>
+            <span class="stat-text">
+                <span class="stat-label">مشتریان</span>
+                <span class="stat-value">@_data.CustomerCount</span>
+            </span>
         </div>
-        <div class="stat-tile">
-            <span class="stat-label">کل پیام‌های ارسال‌شده</span>
-            <span class="stat-value">@_data.TotalMessages</span>
+        <div class="stat-tile stat-info">
+            <span class="stat-icon"><TelerikSvgIcon Icon="@SvgIcon.Comment" /></span>
+            <span class="stat-text">
+                <span class="stat-label">کل پیام‌های ارسال‌شده</span>
+                <span class="stat-value">@_data.TotalMessages</span>
+            </span>
         </div>
         <div class="stat-tile stat-warn">
-            <span class="stat-label">حل‌نشده</span>
-            <span class="stat-value">@_data.UnresolvedMessages</span>
+            <span class="stat-icon"><TelerikSvgIcon Icon="@SvgIcon.ExclamationCircle" /></span>
+            <span class="stat-text">
+                <span class="stat-label">حل‌نشده</span>
+                <span class="stat-value">@_data.UnresolvedMessages</span>
+            </span>
         </div>
         <div class="stat-tile stat-ok">
-            <span class="stat-label">حل‌شده</span>
-            <span class="stat-value">@_data.ResolvedMessages</span>
+            <span class="stat-icon"><TelerikSvgIcon Icon="@SvgIcon.CheckCircle" /></span>
+            <span class="stat-text">
+                <span class="stat-label">حل‌شده</span>
+                <span class="stat-value">@_data.ResolvedMessages</span>
+            </span>
         </div>
     </div>
 
     @if (_data.TotalMessages == 0)
     {
-        <div class="banner banner-info">هنوز پیامی به گروه‌های اولویت ارسال نشده است. نمودارها پس از ارسال اولین پیام نمایش داده می‌شوند.</div>
+        <div class="empty-state">
+            <TelerikSvgIcon Icon="@SvgIcon.Comment" />
+            <strong>هنوز پیامی ارسال نشده است</strong>
+            <span>نمودارها پس از ارسال اولین پیام به گروه‌های اولویت نمایش داده می‌شوند.</span>
+        </div>
     }
     else
     {

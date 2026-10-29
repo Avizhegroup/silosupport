@@ -101,6 +101,12 @@ static server-rendered pages (they post a form), so they use plain inputs styled
 
 - `App.razor` renders `<html lang="fa" dir="rtl">`; the Telerik theme and layout mirror automatically. Charts and the
   Bale-id / group-id inputs sit in `dir="ltr"` containers so numbers and axes are not mirrored.
+- RTL is applied at several levels so no component can fall back to LTR: `<html lang="fa" dir="rtl">`,
+  `<body dir="rtl">`, the `app-root k-rtl` wrapper inside `TelerikRootComponent`, and `direction: rtl` rules in `app.css`.
+- Font: **Vazirmatn** (SIL OFL 1.1) is bundled in `wwwroot/fonts` (Regular, Medium, Bold + licence) and set as the page
+  font and as `--kendo-font-family`, so Telerik components and charts use it too. No CDN is needed.
+- The sidebar drawer starts **closed** and opens over the page (overlay) from the menu button; it closes again after
+  navigation.
 - All page texts, validation messages and service messages are Persian. Priorities are shown as کم / متوسط / بحرانی
   (`PriorityHelper.DisplayName`); the stored values stay `Low` / `Medium` / `Critical`.
 - Timestamps are shown in Iran time (UTC+03:30) with the Jalali calendar (`PersianDateFormatter`).
@@ -203,7 +209,7 @@ dotnet ef migrations add InitialCreate -p SiloSupport.Persistence -s SiloSupport
 
 ## Tests
 
-`dotnet test SiloSupport.slnx` — covers priority parsing, the dashboard statistics (totals, per-customer, daily buckets in Iran time, window boundaries), Persian date/priority formatting, the text Bale id (validation, storage, matching a numeric sender), the prompt and formatter, all routing rules (fakes for
+`dotnet test SiloSupport.slnx` — `UiConventionTests` guard the UI conventions (RTL document, bundled Vazirmatn files, drawer closed by default, sidebar links, role attribute on every admin page, no bot code in Web) by reading the Web source files; it covers priority parsing, the dashboard statistics (totals, per-customer, daily buckets in Iran time, window boundaries), Persian date/priority formatting, the text Bale id (validation, storage, matching a numeric sender), the prompt and formatter, all routing rules (fakes for
 repositories, Bale and the AI API), the Bale and AI adapters (stub handlers, no network), EF constraints / repositories /
 services (SQLite in-memory) including the conversation queries and the resolve flag, and the migration chain.
 The Blazor Web project has no tests by decision.

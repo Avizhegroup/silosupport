@@ -8,7 +8,10 @@
 <PageTitle>گفتگوها</PageTitle>
 
 <div class="page-header">
-    <h1>گفتگوهای مشتریان</h1>
+    <div>
+        <h1>گفتگوهای مشتریان</h1>
+        <p class="page-sub">پیام‌های ارسال‌شده به گروه‌های اولویت هر مشتری و وضعیت رسیدگی به آن‌ها</p>
+    </div>
 </div>
 
 <div class="form-row">
@@ -22,11 +25,15 @@
 
 @if (CustomerId is null)
 {
-    <div class="banner banner-info">برای مشاهده پیام‌های ارسال‌شده به گروه‌های اولویت، یک مشتری انتخاب کنید.</div>
+    <div class="empty-state">
+        <TelerikSvgIcon Icon="@SvgIcon.Comment" />
+        <strong>یک مشتری انتخاب کنید</strong>
+        <span>پیام‌های ارسال‌شده به گروه‌های اولویت او در اینجا نمایش داده می‌شود.</span>
+    </div>
 }
 else if (_loading)
 {
-    <p class="muted">در حال بارگذاری…</p>
+    <div class="loading-state">در حال بارگذاری…</div>
 }
 else if (_conversation is null)
 {

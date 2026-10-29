@@ -5,7 +5,10 @@
 <PageTitle>مشتریان</PageTitle>
 
 <div class="page-header">
-    <h1>مشتریان</h1>
+    <div>
+        <h1>مشتریان</h1>
+        <p class="page-sub">مدیریت مشتریان، اعضا و گروه‌های مقصد</p>
+    </div>
     <LinkButton Href="/admin/customers/new" Primary="true">مشتری جدید</LinkButton>
 </div>
 
@@ -13,14 +16,19 @@
 
 @if (_items is null)
 {
-    <p class="muted">در حال بارگذاری…</p>
+    <div class="loading-state">در حال بارگذاری…</div>
 }
 else if (_items.Count == 0)
 {
-    <div class="banner banner-info">هنوز مشتری‌ای ثبت نشده است. اولین مشتری را ایجاد کنید.</div>
+    <div class="empty-state">
+        <TelerikSvgIcon Icon="@SvgIcon.User" />
+        <strong>هنوز مشتری‌ای ثبت نشده است</strong>
+        <span>با دکمه «مشتری جدید» اولین مشتری را ایجاد کنید.</span>
+    </div>
 }
 else
 {
+    <div class="panel">
     <TelerikGrid Data="_items" TItem="CustomerListItemDto" Sortable="true" Height="600px">
         <GridColumns>
             <GridColumn Field="@nameof(CustomerListItemDto.Name)" Title="نام">
@@ -56,6 +64,7 @@ else
             </GridColumn>
         </GridColumns>
     </TelerikGrid>
+    </div>
 }
 
 <ConfirmDialog Visible="_toDelete is not null"
