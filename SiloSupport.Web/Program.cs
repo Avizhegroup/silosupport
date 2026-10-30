@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SiloSupport.Application.Services;
 using SiloSupport.Persistence;
@@ -50,7 +50,10 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<DashboardService>();
 
 // 4. Blazor + Telerik UI for Blazor.
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddRazorComponents(options =>
+{
+    options.DetailedErrors = true;
+}).AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization(options =>
 {

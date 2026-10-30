@@ -5,5 +5,6 @@ public enum RagDocType
     GeneralChat,
     Report,
     Image,
-    PageAgent
+    PageAgent,
+    Support
 }

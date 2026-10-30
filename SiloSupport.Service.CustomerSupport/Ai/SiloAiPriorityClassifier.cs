@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using SiloSupport.Application;
 using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Helpers;
@@ -30,7 +30,7 @@ public class SiloAiPriorityClassifier : IMessagePriorityClassifier
             response = await _ai.SendAsync(
                 conversationId: null,
                 PriorityClassificationPrompt.Build(customerMessage),
-                RagDocType.GeneralChat,
+                RagDocType.Support,
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

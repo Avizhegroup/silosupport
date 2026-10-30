@@ -165,7 +165,7 @@ public class BaleBotWorker : BackgroundService
         }
 
         var response = await _siloAiClient.SendVoiceAsync(
-            conversationId, audio, fileName, contentType, RagDocType.GeneralChat, stoppingToken);
+            conversationId, audio, fileName, contentType, RagDocType.Support, stoppingToken);
 
         if (response?.Audio is not { Length: > 0 })
         {
@@ -191,13 +191,13 @@ public class BaleBotWorker : BackgroundService
         if (conversationId is null)
         {
             _logger.LogInformation("Starting new Silo AI conversation for chat {ChatId}", chatId);
-            conversationId = await _siloAiClient.StartNewSessionAsync(RagDocType.GeneralChat, stoppingToken);
+            conversationId = await _siloAiClient.StartNewSessionAsync(RagDocType.Support, stoppingToken);
             if (conversationId is not null)
                 _chatConversations[chatId] = conversationId;
         }
 
         _logger.LogInformation("Sending request to Silo AI");
-        var response = await _siloAiClient.SendAsync(conversationId, text, RagDocType.GeneralChat, stoppingToken);
+        var response = await _siloAiClient.SendAsync(conversationId, text, RagDocType.Support, stoppingToken);
 
         if (response is null || string.IsNullOrWhiteSpace(response.ResponseText))
         {

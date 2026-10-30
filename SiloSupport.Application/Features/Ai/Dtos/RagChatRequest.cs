@@ -18,7 +18,7 @@ public class RagChatRequest
     public bool IsMainChat { get; set; }
 
     [JsonPropertyName("docType")]
-    public RagDocType DocType { get; set; } = RagDocType.GeneralChat;
+    public RagDocType DocType { get; set; } = RagDocType.Support;
 
     [JsonPropertyName("key")]
     public string? Key { get; set; }

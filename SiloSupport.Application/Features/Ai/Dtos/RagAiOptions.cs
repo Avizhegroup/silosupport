@@ -13,7 +13,7 @@ public class RagAiOptions
 
     public bool IsMainChat { get; set; }
 
-    public RagDocType DocType { get; set; } = RagDocType.GeneralChat;
+    public RagDocType DocType { get; set; } = RagDocType.Support;
 
     public string? Key { get; set; }
 }
