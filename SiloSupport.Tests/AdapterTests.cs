@@ -95,7 +95,7 @@ public class BaleBotApiClientTests
     {
         const string json = """
         {"ok":true,"result":[
-          {"update_id":10,"message":{"message_id":1,"from":{"id":4503599627370495,"is_bot":false},"chat":{"id":-77,"type":"group"},"text":"hi"}},
+          {"update_id":10,"message":{"message_id":1,"from":{"id":4503599627370495,"is_bot":false,"username":"ali"},"chat":{"id":-77,"type":"group"},"text":"hi"}},
           {"update_id":11,"message":{"message_id":2,"from":{"id":5,"is_bot":false},"chat":{"id":-77,"type":"group"},"voice":{"file_id":"f","file_unique_id":"u"}}},
           {"update_id":12,"message":{"message_id":3,"from":{"id":6,"is_bot":true},"chat":{"id":-77,"type":"group"},"photo":[{"file_id":"p"}]}},
           {"update_id":13}
@@ -111,9 +111,11 @@ public class BaleBotApiClientTests
         var text = updates[0].Message!;
         Assert.Equal(-77, text.ChatId);
         Assert.Equal(4503599627370495, text.SenderId);
+        Assert.Equal("ali", text.SenderUsername);
         Assert.Equal("hi", text.Text);
         Assert.False(text.HasNonTextContent);
 
+        Assert.Null(updates[1].Message!.SenderUsername);
         Assert.True(updates[1].Message!.HasNonTextContent);
         Assert.Null(updates[1].Message!.Text);
 

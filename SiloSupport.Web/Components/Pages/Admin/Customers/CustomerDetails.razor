@@ -52,7 +52,12 @@ else
                 <GridColumns>
                     <GridColumn Field="@nameof(MemberDto.Name)" Title="نام" />
                     <GridColumn Field="@nameof(MemberDto.PhoneNumber)" Title="تلفن" />
-                    <GridColumn Field="@nameof(MemberDto.BaleId)" Title="شناسه بله" />
+                    <GridColumn Field="@nameof(MemberDto.BaleId)" Title="شناسه بله">
+                        <Template>
+                            @{ var m = (MemberDto)context; }
+                            <bdi dir="ltr">@m.BaleId</bdi>
+                        </Template>
+                    </GridColumn>
                     <GridColumn Field="@nameof(MemberDto.Description)" Title="توضیحات" />
                     <GridColumn Title="عملیات" Width="220px" Sortable="false">
                         <Template>

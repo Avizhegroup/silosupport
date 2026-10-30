@@ -70,7 +70,7 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 
 ## Data model and constraints
 
-- `CustomerMember.BaleId`: **text** (`nvarchar(64)`, trimmed). The numeric sender id of an incoming Bale message is compared with it as its invariant decimal string, so a member registered with `123456789` matches sender `123456789`.
+- `CustomerMember.BaleId`: **text** (`nvarchar(64)`, trimmed). Administrators enter the Bale **user name** (`@ali`) or the numeric Bale user id. An incoming message is matched on the numeric `from.id` **or** the `from.username`, ignoring case and a leading `@` (`@Ali`, `ali` and `ALI` are the same). A numeric id match wins over a user name match. If the match spans members of more than one customer, the message is ignored with a warning. Bale messages never carry the sender's phone number, so the phone number cannot be used for matching. A member without a Bale user name must be registered by numeric id; the console log of an ignored message prints both the id and the user name to copy.
 - `CustomerGroup.BaleId`: `long` (chat ids can exceed 32 bits, up to 52 significant bits).
 - Unique: `CustomerMembers.BaleId`; `CustomerGroups.BaleId`; `CustomerGroups(CustomerId, Priority)`.
 - `CustomerGroups.Priority` is stored as text (`Low`/`Medium`/`Critical`).

@@ -49,8 +49,8 @@ public class CustomerMessageProcessorTests
         _store.Groups.Add(new CustomerGroup { Id = firstId + 2, CustomerId = customerId, Priority = GroupPriority.Critical, BaleId = firstBaleId + 2, Name = $"C{customerId} Critical" });
     }
 
-    private static IncomingBaleMessage Text(long sender, string text, long chat = SupportGroup, bool isBot = false) =>
-        new(MessageId: 1, ChatId: chat, SenderId: sender, SenderIsBot: isBot, Text: text, HasNonTextContent: false);
+    private static IncomingBaleMessage Text(long sender, string text, long chat = SupportGroup, bool isBot = false, string? username = null) =>
+        new(MessageId: 1, ChatId: chat, SenderId: sender, SenderIsBot: isBot, Text: text, HasNonTextContent: false, SenderUsername: username);
 
     private void ClassifyAs(GroupPriority priority, string? analysis = "AI analysis text") =>
         _classifier.Result = PriorityClassificationResult.Success(priority, analysis);
@@ -77,6 +77,70 @@ public class CustomerMessageProcessorTests
 
         Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
         Assert.Equal(3003, _bale.Sent.Single().ChatId); // Beta's Critical group
+    }
+
+    [Theory]
+    [InlineData("@ali", "ali")]
+    [InlineData("ali", "ali")]
+    [InlineData("@Ali", "ALI")]
+    [InlineData("ali", "@ali")]
+    public async Task ProcessAsync_MemberRegisteredByUserName_IsMatchedByTheSenderUserName(string stored, string incoming)
+    {
+        _store.Members.Add(new CustomerMember { Id = 3, CustomerId = 2, BaleId = stored, Name = "Ali", PhoneNumber = "0912" });
+        ClassifyAs(GroupPriority.Critical);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "urgent", username: incoming), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Equal(3003, _bale.Sent.Single().ChatId); // Beta's Critical group
+    }
+
+    [Fact]
+    public async Task ProcessAsync_NumericIdMatchWinsOverUserNameOfAnotherCustomer()
+    {
+        _store.Members.Add(new CustomerMember { Id = 3, CustomerId = 2, BaleId = "@ali", Name = "Ali", PhoneNumber = "0" });
+        ClassifyAs(GroupPriority.Low);
+
+        // Sender id belongs to Acme's Sara, but the user name is registered for Beta's Ali.
+        var outcome = await _processor.ProcessAsync(Text(AcmeMember, "hello", username: "ali"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Equal(2001, _bale.Sent.Single().ChatId); // Acme's Low group
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UserNameRegisteredForTwoCustomers_IsIgnoredWithWarning()
+    {
+        _store.Members.Add(new CustomerMember { Id = 3, CustomerId = 1, BaleId = "@ali", Name = "Ali A", PhoneNumber = "0" });
+        _store.Members.Add(new CustomerMember { Id = 4, CustomerId = 2, BaleId = "ali", Name = "Ali B", PhoneNumber = "0" });
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "hello", username: "ali"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.IgnoredUnknownMember, outcome);
+        Assert.Empty(_bale.Sent);
+        Assert.True(_logger.Has(LogLevel.Warning, "several customers"));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UnknownUserName_IsIgnoredAndLogMentionsHowToRegister()
+    {
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "hello", username: "stranger"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.IgnoredUnknownMember, outcome);
+        Assert.True(_logger.Has(LogLevel.Information, "@stranger"));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_NoSenderIdButKnownUserName_IsForwarded()
+    {
+        _store.Members.Add(new CustomerMember { Id = 3, CustomerId = 1, BaleId = "@sara", Name = "Sara", PhoneNumber = "0" });
+        ClassifyAs(GroupPriority.Medium);
+        var message = new IncomingBaleMessage(1, SupportGroup, null, false, "hello", false, "sara");
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, await _processor.ProcessAsync(message, CancellationToken.None));
     }
 
     // 1

@@ -94,22 +94,25 @@ public sealed class FakeMemberRepository : ICustomerMemberRepository
 
     public FakeMemberRepository(FakeStore store) => _store = store;
 
-    public Task<CustomerMember?> FindByBaleIdAsync(string baleId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CustomerMember>> FindByBaleIdsAsync(IReadOnlyCollection<string> candidates, CancellationToken cancellationToken = default)
     {
-        var member = _store.Members.FirstOrDefault(m => m.BaleId == baleId);
-        if (member is null)
-            return Task.FromResult<CustomerMember?>(null);
+        var lowered = candidates.Select(c => c.ToLowerInvariant()).ToHashSet();
 
-        return Task.FromResult<CustomerMember?>(new CustomerMember
-        {
-            Id = member.Id,
-            Name = member.Name,
-            Description = member.Description,
-            PhoneNumber = member.PhoneNumber,
-            BaleId = member.BaleId,
-            CustomerId = member.CustomerId,
-            Customer = _store.Customers.FirstOrDefault(c => c.Id == member.CustomerId)
-        });
+        IReadOnlyList<CustomerMember> found = _store.Members
+            .Where(m => lowered.Contains(m.BaleId.ToLowerInvariant()))
+            .Select(member => new CustomerMember
+            {
+                Id = member.Id,
+                Name = member.Name,
+                Description = member.Description,
+                PhoneNumber = member.PhoneNumber,
+                BaleId = member.BaleId,
+                CustomerId = member.CustomerId,
+                Customer = _store.Customers.FirstOrDefault(c => c.Id == member.CustomerId)
+            })
+            .ToList();
+
+        return Task.FromResult(found);
     }
 
     public Task<IReadOnlyList<CustomerMember>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
