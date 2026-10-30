@@ -2,55 +2,64 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 
-<TelerikRootComponent>
-    <TelerikAppBar ThemeColor="@ThemeConstants.AppBar.ThemeColor.Dark" Class="app-bar">
-        <AppBarSection>
-            <AuthorizeView Roles="@AppRoles.Administrator">
+<TelerikRootComponent EnableRtl="true">
+    <div class="app-root k-rtl" dir="rtl">
+        <TelerikAppBar ThemeColor="@ThemeConstants.AppBar.ThemeColor.Dark" Class="app-bar">
+            <AppBarSection>
+                <AuthorizeView Roles="@AppRoles.Administrator">
+                    <Authorized>
+                        <TelerikButton Icon="@SvgIcon.Menu" FillMode="@ThemeConstants.Button.FillMode.Flat" OnClick="ToggleDrawer">منو</TelerikButton>
+                    </Authorized>
+                </AuthorizeView>
+            </AppBarSection>
+            <AppBarSection>
+                <span class="app-brand">
+                    <span class="app-brand-mark">S</span>
+                    <span class="app-title">پشتیبانی سیلو</span>
+                </span>
+            </AppBarSection>
+            <AppBarSpacer />
+            <AuthorizeView>
                 <Authorized>
-                    <TelerikButton Icon="@SvgIcon.Menu" FillMode="@ThemeConstants.Button.FillMode.Flat" OnClick="ToggleDrawer">منو</TelerikButton>
+                    <AppBarSection>
+                        <span class="app-user">
+                            <span class="app-avatar">@Initial(context.User.Identity?.Name)</span>
+                            <span class="app-user-name">@context.User.Identity?.Name</span>
+                        </span>
+                    </AppBarSection>
+                    <AppBarSection>
+                        <TelerikButton Icon="@SvgIcon.Logout" FillMode="@ThemeConstants.Button.FillMode.Flat" OnClick="SignOut">خروج</TelerikButton>
+                    </AppBarSection>
                 </Authorized>
             </AuthorizeView>
-        </AppBarSection>
-        <AppBarSection>
-            <span class="app-title">پشتیبانی سیلو</span>
-        </AppBarSection>
-        <AppBarSpacer />
-        <AuthorizeView>
-            <Authorized>
-                <AppBarSection>
-                    <span class="app-user">@context.User.Identity?.Name</span>
-                </AppBarSection>
-                <AppBarSection>
-                    <TelerikButton Icon="@SvgIcon.Logout" FillMode="@ThemeConstants.Button.FillMode.Outline" OnClick="SignOut">خروج</TelerikButton>
-                </AppBarSection>
-            </Authorized>
-        </AuthorizeView>
-    </TelerikAppBar>
+        </TelerikAppBar>
 
-    <AuthorizeView Roles="@AppRoles.Administrator">
-        <Authorized>
-            <TelerikDrawer Data="@_items"
-                           @bind-Expanded="_expanded"
-                           Mode="@DrawerMode.Push"
-                           MiniMode="true"
-                           Width="220px"
-                           SelectedItem="@_selected"
-                           TextField="@nameof(NavItem.Text)"
-                           UrlField="@nameof(NavItem.Url)"
-                           IconField="@nameof(NavItem.Icon)">
-                <DrawerContent>
-                    <main class="app-content">
-                        @Body
-                    </main>
-                </DrawerContent>
-            </TelerikDrawer>
-        </Authorized>
-        <NotAuthorized>
-            <main class="app-content">
-                @Body
-            </main>
-        </NotAuthorized>
-    </AuthorizeView>
+        <AuthorizeView Roles="@AppRoles.Administrator">
+            <Authorized>
+                @* The sidebar starts closed and opens over the page (overlay) from the menu button. *@
+                <TelerikDrawer Data="@_items"
+                               @bind-Expanded="_expanded"
+                               Mode="@DrawerMode.Overlay"
+                               MiniMode="false"
+                               Width="240px"
+                               SelectedItem="@_selected"
+                               TextField="@nameof(NavItem.Text)"
+                               UrlField="@nameof(NavItem.Url)"
+                               IconField="@nameof(NavItem.Icon)">
+                    <DrawerContent>
+                        <main class="app-content">
+                            @Body
+                        </main>
+                    </DrawerContent>
+                </TelerikDrawer>
+            </Authorized>
+            <NotAuthorized>
+                <main class="app-content">
+                    @Body
+                </main>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
 </TelerikRootComponent>
 
 @code {
@@ -69,7 +78,8 @@
         new NavItem { Text = "گفتگوها", Url = "/admin/conversations", Icon = SvgIcon.Comment }
     };
 
-    private bool _expanded = true;
+    // Closed by default.
+    private bool _expanded;
     private NavItem? _selected;
 
     protected override void OnInitialized()
@@ -81,6 +91,7 @@
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         _selected = Match(e.Location);
+        _expanded = false; // close the sidebar after navigating
         InvokeAsync(StateHasChanged);
     }
 
@@ -90,6 +101,9 @@
         var path = "/" + new Uri(uri).AbsolutePath.Trim('/');
         return _items.FirstOrDefault(i => i.Url == "/" ? path == "/" : path.StartsWith(i.Url, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static string Initial(string? name) =>
+        string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
 
     private void ToggleDrawer() => _expanded = !_expanded;
 
