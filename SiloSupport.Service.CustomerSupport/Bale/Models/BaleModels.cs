@@ -27,6 +27,10 @@ public class BaleUser
 
     [JsonPropertyName("is_bot")]
     public bool IsBot { get; set; }
+
+    /// <summary>Bale user name without '@' (optional; users without one have none).</summary>
+    [JsonPropertyName("username")]
+    public string? Username { get; set; }
 }
 
 /// <summary>Bale "Chat" object.</summary>

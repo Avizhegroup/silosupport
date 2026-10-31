@@ -196,6 +196,8 @@ public class MemberInputValidationTests
     [InlineData("4503599627370495")]
     [InlineData("user_42")]
     [InlineData("  777  ")]
+    [InlineData("@ali")]
+    [InlineData("Ali_Support")]
     public void BaleId_AcceptsTextIds(string baleId)
     {
         Assert.Empty(Validate(new MemberInput { Name = "Sara", BaleId = baleId }));
@@ -206,6 +208,9 @@ public class MemberInputValidationTests
     [InlineData("   ")]
     [InlineData("0")]
     [InlineData("12 34")]
+    [InlineData("@")]
+    [InlineData("@@ali")]
+    [InlineData("@ al")]
     public void BaleId_RejectsEmptyZeroOrIdsContainingSpaces(string baleId)
     {
         var errors = Validate(new MemberInput { Name = "Sara", BaleId = baleId });

@@ -73,19 +73,26 @@ public class CustomerMessageProcessor
             return MessageProcessingOutcome.IgnoredEmptyText;
         }
 
-        // 6-8. Identify the sender, find the registered member and resolve the customer.
-        if (message.SenderId is null)
+        // 6-8. Identify the sender, find the registered member and resolve the customer. Administrators register a
+        //      member by Bale user name ("@ali") or by numeric id, so both of the sender's identifiers are tried.
+        var candidates = BaleIdentity.CandidatesFor(message.SenderId, message.SenderUsername);
+        if (candidates.Count == 0)
         {
-            _logger.LogInformation("Ignoring Bale message {MessageId}: no sender id", message.MessageId);
+            _logger.LogInformation("Ignoring Bale message {MessageId}: Bale sent neither a sender id nor a user name", message.MessageId);
             return MessageProcessingOutcome.IgnoredUnknownMember;
         }
 
-        var member = await _members.FindByBaleIdAsync(message.SenderId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken);
+        var matches = await _members.FindByBaleIdsAsync(candidates, cancellationToken);
+        var member = SelectMember(matches, message);
         if (member is null)
         {
+            var shownId = message.SenderId?.ToString() ?? "-";
+            var shownUsername = string.IsNullOrWhiteSpace(message.SenderUsername) ? "-" : "@" + message.SenderUsername.Trim().TrimStart('@');
             _logger.LogInformation(
-                "Ignoring Bale message {MessageId}: sender {SenderBaleId} is not a registered customer member",
-                message.MessageId, message.SenderId.Value);
+                "Ignoring Bale message {MessageId}: sender (id {SenderId}, user name {SenderUsername}) is not a registered customer member. " +
+                "Register the member with Bale ID {RegisterAs}",
+                message.MessageId, shownId, shownUsername,
+                shownUsername == "-" ? shownId : $"'{shownUsername}' (or the numeric id {shownId})");
             return MessageProcessingOutcome.IgnoredUnknownMember;
         }
 
@@ -192,6 +199,38 @@ public class CustomerMessageProcessor
             "Forwarded Bale message {MessageId} of customer {CustomerId} to group {GroupId} with priority {Priority}",
             message.MessageId, customerId, destination.Id, classification.Priority);
         return MessageProcessingOutcome.Forwarded;
+    }
+
+    /// <summary>
+    /// A match by numeric sender id wins over a match by user name (ids never change, user names can). When the best
+    /// matches belong to different customers the message is not routed at all: sending a customer's text to another
+    /// customer's group would be worse than ignoring it.
+    /// </summary>
+    private CustomerMember? SelectMember(IReadOnlyList<CustomerMember> matches, IncomingBaleMessage message)
+    {
+        if (matches.Count == 0)
+            return null;
+
+        var byId = message.SenderId is null
+            ? new List<CustomerMember>()
+            : matches.Where(m => BaleIdentity.IsNumericIdMatch(m.BaleId, message.SenderId.Value)).ToList();
+
+        var best = byId.Count > 0
+            ? byId
+            : matches.Where(m => BaleIdentity.IsUsernameMatch(m.BaleId, message.SenderUsername)).ToList();
+
+        if (best.Count == 0)
+            return null;
+
+        if (best.Select(m => m.CustomerId).Distinct().Count() > 1)
+        {
+            _logger.LogWarning(
+                "Ignoring Bale message {MessageId}: the sender matches members of several customers ({CustomerIds}); fix the duplicate Bale IDs",
+                message.MessageId, string.Join(", ", best.Select(m => m.CustomerId).Distinct()));
+            return null;
+        }
+
+        return best.OrderBy(m => m.Id).First();
     }
 
     private async Task<bool> IsOwnBotAsync(long? senderId, CancellationToken cancellationToken)

@@ -1,3 +1,4 @@
+using SiloSupport.Application.Helpers;
 using Microsoft.EntityFrameworkCore;
 using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Interfaces;
@@ -13,6 +14,22 @@ namespace SiloSupport.Tests;
 public class PersistenceTests : TestBase
 {
     // 17
+    [Theory]
+    [InlineData("@Ali", "ali")]
+    [InlineData("ali", "@ALI")]
+    [InlineData("@ali", "@ali")]
+    public async Task MemberBaleUserName_IsFoundIgnoringCaseAndAtSign(string stored, string incoming)
+    {
+        var customer = await AddCustomerAsync();
+        await AddMemberAsync(customer.Id, stored);
+
+        var matches = await Get<ICustomerMemberRepository>()
+            .FindByBaleIdsAsync(BaleIdentity.CandidatesFor(null, incoming));
+
+        Assert.Equal(stored, Assert.Single(matches).BaleId);
+        Assert.True(await Get<ICustomerMemberRepository>().BaleIdExistsAsync(incoming, null));
+    }
+
     [Fact]
     public async Task Database_RejectsTwoGroupsWithTheSamePriorityForOneCustomer()
     {
@@ -109,10 +126,10 @@ public class PersistenceTests : TestBase
         var customer = await AddCustomerAsync();
         await AddMemberAsync(customer.Id, baleId);
 
-        var found = await Get<ICustomerMemberRepository>().FindByBaleIdAsync(baleId);
+        var matches = await Get<ICustomerMemberRepository>().FindByBaleIdsAsync(BaleIdentity.Variants(baleId).ToList());
 
-        Assert.NotNull(found);
-        Assert.Equal(baleId, found!.BaleId);
+        var found = Assert.Single(matches);
+        Assert.Equal(baleId, found.BaleId);
         Assert.Equal(customer.Id, found.CustomerId);
         Assert.Equal("Acme", found.Customer!.Name);
     }

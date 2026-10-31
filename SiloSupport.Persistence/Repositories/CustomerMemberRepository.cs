@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SiloSupport.Application.Helpers;
 using SiloSupport.Application.Interfaces;
 using SiloSupport.Domain.Entities;
 
@@ -27,18 +28,26 @@ public class CustomerMemberRepository : ICustomerMemberRepository
         return _db.CustomerMembers.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
-    public Task<CustomerMember?> FindByBaleIdAsync(string baleId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CustomerMember>> FindByBaleIdsAsync(IReadOnlyCollection<string> candidates, CancellationToken cancellationToken = default)
     {
-        return _db.CustomerMembers
+        if (candidates.Count == 0)
+            return Array.Empty<CustomerMember>();
+
+        var lowered = candidates.Select(c => c.Trim().ToLowerInvariant()).Where(c => c.Length > 0).Distinct().ToList();
+
+        return await _db.CustomerMembers
             .AsNoTracking()
             .Include(m => m.Customer)
-            .FirstOrDefaultAsync(m => m.BaleId == baleId, cancellationToken);
+            .Where(m => lowered.Contains(m.BaleId.ToLower()))
+            .ToListAsync(cancellationToken);
     }
 
     public Task<bool> BaleIdExistsAsync(string baleId, int? excludeMemberId, CancellationToken cancellationToken = default)
     {
+        var variants = BaleIdentity.Variants(baleId).ToList();
+
         return _db.CustomerMembers.AnyAsync(
-            m => m.BaleId == baleId && (excludeMemberId == null || m.Id != excludeMemberId),
+            m => variants.Contains(m.BaleId.ToLower()) && (excludeMemberId == null || m.Id != excludeMemberId),
             cancellationToken);
     }
 

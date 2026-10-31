@@ -9,13 +9,15 @@ namespace SiloSupport.Service.CustomerSupport.Models;
 /// <param name="SenderIsBot">True when Bale flags the sender as a bot.</param>
 /// <param name="Text">The plain text of an ordinary text message; null for non-text messages.</param>
 /// <param name="HasNonTextContent">True when the message carries voice, audio, photo, document, video, sticker, etc.</param>
+/// <param name="SenderUsername">Bale user name of the sender without '@' (for example "ali"), or null when the sender has none.</param>
 public sealed record IncomingBaleMessage(
     long MessageId,
     long ChatId,
     long? SenderId,
     bool SenderIsBot,
     string? Text,
-    bool HasNonTextContent);
+    bool HasNonTextContent,
+    string? SenderUsername = null);
 
 /// <summary>One getUpdates entry: its id (to advance the offset) and the message when it carried one.</summary>
 public sealed record BalePolledUpdate(long UpdateId, IncomingBaleMessage? Message);

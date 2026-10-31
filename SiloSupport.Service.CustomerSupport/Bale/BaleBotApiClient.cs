@@ -128,6 +128,7 @@ public class BaleBotApiClient : IBaleBotClient
                 message.From?.Id,
                 message.From?.IsBot ?? false,
                 message.Text,
-                message.HasNonTextContent));
+                message.HasNonTextContent,
+                message.From?.Username));
     }
 }

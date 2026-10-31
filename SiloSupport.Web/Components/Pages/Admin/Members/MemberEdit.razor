@@ -38,11 +38,11 @@ else
                 <ValidationMessage For="() => _model.PhoneNumber" />
             </div>
             <div class="form-row">
-                <label>شناسه بله</label>
+                <label>شناسه بله (نام کاربری یا شناسه عددی)</label>
                 <div dir="ltr">
                     <TelerikTextBox @bind-Value="_model.BaleId" Width="100%" />
                 </div>
-                <div class="hint">شناسه‌ای که بله برای این شخص به‌عنوان فرستنده گزارش می‌کند. در میان همه اعضا باید یکتا باشد.</div>
+                <div class="hint">نام کاربری بله مثل <bdi dir="ltr">&#64;ali</bdi> یا شناسه عددی کاربر را وارد کنید؛ پیام‌های فرستنده با هر دو روش شناسایی می‌شوند. حروف بزرگ و کوچک و علامت <bdi dir="ltr">&#64;</bdi> تأثیری ندارند و مقدار باید در میان همه اعضا یکتا باشد.</div>
                 <ValidationMessage For="() => _model.BaleId" />
             </div>
             <div class="form-row">

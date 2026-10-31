@@ -27,7 +27,10 @@ public class MemberInput : IValidatableObject
     [StringLength(32, ErrorMessage = "شماره تلفن نباید بیشتر از ۳۲ کاراکتر باشد.")]
     public string PhoneNumber { get; set; } = string.Empty;
 
-    /// <summary>The member's Bale user id as text (for example "123456789").</summary>
+    /// <summary>
+    /// The member's Bale ID as text: the Bale user name (for example "@ali" or "ali") or the numeric Bale user id
+    /// (for example "123456789"). Incoming messages are matched against either one.
+    /// </summary>
     [Required(ErrorMessage = "شناسه بله الزامی است.")]
     [StringLength(64, ErrorMessage = "شناسه بله نباید بیشتر از ۶۴ کاراکتر باشد.")]
     public string BaleId { get; set; } = string.Empty;
@@ -42,6 +45,10 @@ public class MemberInput : IValidatableObject
             yield return new ValidationResult("شناسه بله الزامی است و نمی‌تواند ۰ باشد.", new[] { nameof(BaleId) });
         else if (id.Any(char.IsWhiteSpace))
             yield return new ValidationResult("شناسه بله نباید شامل فاصله باشد.", new[] { nameof(BaleId) });
+        else if (id.TrimStart('@').Length == 0)
+            yield return new ValidationResult("نام کاربری بله باید بعد از @ حداقل یک نویسه داشته باشد.", new[] { nameof(BaleId) });
+        else if (id.TrimStart('@') != id.TrimStart('@').TrimEnd('@') || id.Count(c => c == '@') > 1)
+            yield return new ValidationResult("شناسه بله فقط می‌تواند با یک @ شروع شود.", new[] { nameof(BaleId) });
     }
 }
 
