@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SiloSupport.Application.Services;
 using SiloSupport.Persistence;
-using Microsoft.AspNetCore.Authorization;
 using SiloSupport.Web.Components;
+using SiloSupport.Web.Extensions;
 using SiloSupport.Web.Localization;
 using SiloSupport.Web.Security;
 using Telerik.Blazor.Services;
@@ -34,9 +35,7 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.AccessDeniedPath = "/Account/AccessDenied";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
-    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     o.ExpireTimeSpan = TimeSpan.FromDays(7);
 });
 
@@ -64,7 +63,7 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddTelerikBlazor();
 builder.Services.AddSingleton(typeof(ITelerikStringLocalizer), typeof(TelerikPersianLocalizer));
-
+builder.Services.AddSiloSerilog(builder.Configuration);
 var app = builder.Build();
 
 // 5. Migrate, seed roles and administrator.
@@ -111,6 +110,7 @@ app.MapGet("/Account/LogoutPost", async (HttpContext http, SignInManager<Applica
     return Results.Redirect("/Account/Login");
 }).AllowAnonymous();
 
+app.MapStaticAssets().AllowAnonymous();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();

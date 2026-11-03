@@ -11,8 +11,8 @@
   </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/Core/">
-    <Project Path="SiloSupport.Domain/SiloSupport.Domain.csproj" />
     <Project Path="SiloSupport.Application/SiloSupport.Application.csproj" />
+    <Project Path="SiloSupport.Domain/SiloSupport.Domain.csproj" />
     <Project Path="SiloSupport.Infrastructure/SiloSupport.Infrastructure.csproj" />
     <Project Path="SiloSupport.Persistence/SiloSupport.Persistence.csproj" />
   </Folder>
@@ -23,6 +23,9 @@
   </Folder>
   <Folder Name="/src/Presentation/Web/">
     <Project Path="SiloSupport.Web/SiloSupport.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="SiloSupport.Shared/SiloSupport.Shared.csproj" Id="fb27e34f-3e13-43db-b0ca-b705331e0070" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="SiloSupport.Tests/SiloSupport.Tests.csproj" />

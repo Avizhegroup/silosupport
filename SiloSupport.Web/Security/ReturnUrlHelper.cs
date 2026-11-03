@@ -1,9 +1,9 @@
-namespace SiloSupport.Web.Security;
+﻿namespace SiloSupport.Web.Security;
 
 /// <summary>Validates post-login return URLs so the login endpoint can never redirect to another site (open redirect).</summary>
 public static class ReturnUrlHelper
 {
-    public const string DefaultUrl = "/admin/customers";
+    public const string DefaultUrl = "/";
 
     /// <summary>True only for local, absolute-path URLs such as "/admin/customers".</summary>
     public static bool IsSafe(string? url)
