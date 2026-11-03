@@ -1,4 +1,4 @@
-using SiloSupport.Application.Dtos;
+﻿using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Helpers;
 using SiloSupport.Application.Interfaces;
 using SiloSupport.Domain.Entities;
@@ -121,8 +121,8 @@ public class CustomerGroupService
         if (await _groups.PriorityTakenAsync(customerId, input.Priority, excludeGroupId, cancellationToken))
             return $"این مشتری از قبل یک گروه با اولویت «{PriorityHelper.DisplayName(input.Priority)}» دارد.";
 
-        if (await _groups.BaleIdExistsAsync(input.BaleId, excludeGroupId, cancellationToken))
-            return "گروه دیگری از همین شناسه گروه بله استفاده می‌کند.";
+        //if (await _groups.BaleIdExistsAsync(input.BaleId, excludeGroupId, cancellationToken))
+        //    return "گروه دیگری از همین شناسه گروه بله استفاده می‌کند.";
 
         return null;
     }

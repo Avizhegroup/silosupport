@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SiloSupport.Domain.Entities;
 
@@ -20,9 +20,6 @@ public class CustomerGroupConfiguration : IEntityTypeConfiguration<CustomerGroup
 
         // One destination group per priority and customer ...
         builder.HasIndex(g => new { g.CustomerId, g.Priority }).IsUnique();
-
-        // ... and a Bale chat can be the destination of only one group.
-        builder.HasIndex(g => g.BaleId).IsUnique();
 
         // Never cascade-delete message history.
         builder.HasMany(g => g.Messages)
