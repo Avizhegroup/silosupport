@@ -44,6 +44,7 @@ public enum MessageProcessingOutcome
     Forwarded,
     IgnoredPriorityGroup,
     IgnoredBotSender,
+    IgnoredSupportPerson,
     IgnoredUnsupportedMessage,
     IgnoredEmptyText,
     IgnoredUnknownMember,

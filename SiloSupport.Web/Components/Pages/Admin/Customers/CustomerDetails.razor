@@ -21,6 +21,17 @@ else
         <div>
             <h1>@_details.Customer.Name</h1>
             <p class="page-sub">@(string.IsNullOrWhiteSpace(_details.Customer.Description) ? "بدون توضیحات." : _details.Customer.Description)</p>
+            <p class="page-sub">
+                شناسه چت بله:
+                @if (_details.Customer.BaleChatId is long chatId)
+                {
+                    <bdi dir="ltr">@chatId</bdi>
+                }
+                else
+                {
+                    <span class="muted">تنظیم نشده</span>
+                }
+            </p>
         </div>
         <div class="page-actions">
             <LinkButton Href="@($"/admin/conversations/{Id}")">گفتگوها</LinkButton>
@@ -55,7 +66,14 @@ else
                     <GridColumn Field="@nameof(MemberDto.BaleId)" Title="شناسه بله">
                         <Template>
                             @{ var m = (MemberDto)context; }
-                            <bdi dir="ltr">@m.BaleId</bdi>
+                            @if (string.IsNullOrWhiteSpace(m.BaleId))
+                            {
+                                <span class="muted">—</span>
+                            }
+                            else
+                            {
+                                <bdi dir="ltr">@m.BaleId</bdi>
+                            }
                         </Template>
                     </GridColumn>
                     <GridColumn Field="@nameof(MemberDto.Description)" Title="توضیحات" />

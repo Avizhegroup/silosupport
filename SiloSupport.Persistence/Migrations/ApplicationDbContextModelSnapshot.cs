@@ -167,6 +167,9 @@ namespace SiloSupport.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<long?>("BaleChatId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -178,6 +181,10 @@ namespace SiloSupport.Persistence.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BaleChatId")
+                        .IsUnique()
+                        .HasFilter("[BaleChatId] IS NOT NULL");
 
                     b.ToTable("Customers", (string)null);
                 });
@@ -257,7 +264,6 @@ namespace SiloSupport.Persistence.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("BaleId")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
@@ -282,11 +288,43 @@ namespace SiloSupport.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BaleId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[BaleId] IS NOT NULL");
 
                     b.HasIndex("CustomerId");
 
                     b.ToTable("CustomerMembers", (string)null);
+                });
+
+            modelBuilder.Entity("SiloSupport.Domain.Entities.SupportPerson", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BaleUsername")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BaleUsername")
+                        .IsUnique();
+
+                    b.ToTable("SupportPersons", (string)null);
                 });
 
             modelBuilder.Entity("SiloSupport.Persistence.ApplicationUser", b =>

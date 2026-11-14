@@ -1,4 +1,3 @@
-using SiloSupport.Application.Helpers;
 using Microsoft.EntityFrameworkCore;
 using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Interfaces;
@@ -24,7 +23,7 @@ public class PersistenceTests : TestBase
         await AddMemberAsync(customer.Id, stored);
 
         var matches = await Get<ICustomerMemberRepository>()
-            .FindByBaleIdsAsync(BaleIdentity.CandidatesFor(null, incoming));
+            .FindBySenderAsync(null, incoming);
 
         Assert.Equal(stored, Assert.Single(matches).BaleId);
         Assert.True(await Get<ICustomerMemberRepository>().BaleIdExistsAsync(incoming, null));
@@ -126,7 +125,7 @@ public class PersistenceTests : TestBase
         var customer = await AddCustomerAsync();
         await AddMemberAsync(customer.Id, baleId);
 
-        var matches = await Get<ICustomerMemberRepository>().FindByBaleIdsAsync(BaleIdentity.Variants(baleId).ToList());
+        var matches = await Get<ICustomerMemberRepository>().FindBySenderAsync(null, baleId);
 
         var found = Assert.Single(matches);
         Assert.Equal(baleId, found.BaleId);
@@ -289,27 +288,55 @@ public class SupportServicesTests : TestBase
         var a = await AddCustomerAsync("A");
         var b = await AddCustomerAsync("B");
         var service = Get<CustomerMemberService>();
-        Assert.True((await service.CreateAsync(a.Id, new MemberInput { Name = "x", BaleId = "77" })).Succeeded);
+        Assert.True((await service.CreateAsync(a.Id, new MemberInput { Name = "x", PhoneNumber = Phone, BaleId = "77" })).Succeeded);
 
-        var duplicate = await service.CreateAsync(b.Id, new MemberInput { Name = "y", BaleId = " 77 " });
+        var duplicate = await service.CreateAsync(b.Id, new MemberInput { Name = "y", PhoneNumber = Phone, BaleId = " 77 " });
 
         Assert.False(duplicate.Succeeded);
         Assert.Contains("شناسه بله", duplicate.FirstError);
     }
 
     [Fact]
-    public async Task MemberService_RequiresNameAndBaleId()
+    public async Task MemberService_RequiresNameAndPhone_AndValidatesAnyBaleId()
     {
         var customer = await AddCustomerAsync();
         var service = Get<CustomerMemberService>();
 
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "", BaleId = "1" })).Succeeded);
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "0" })).Succeeded);
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "" })).Succeeded);
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "   " })).Succeeded);
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = "12 34" })).Succeeded);
-        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", BaleId = new string('9', 65) })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "", PhoneNumber = Phone, BaleId = "1" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", PhoneNumber = "", BaleId = "1" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", PhoneNumber = "0912", BaleId = "1" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", PhoneNumber = Phone, BaleId = "0" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", PhoneNumber = Phone, BaleId = "12 34" })).Succeeded);
+        Assert.False((await service.CreateAsync(customer.Id, new MemberInput { Name = "x", PhoneNumber = Phone, BaleId = new string('9', 65) })).Succeeded);
     }
+
+    [Fact]
+    public async Task MemberService_BaleIdIsOptional_AndSeveralMembersMayHaveNone()
+    {
+        var customer = await AddCustomerAsync();
+        var service = Get<CustomerMemberService>();
+
+        Assert.True((await service.CreateAsync(customer.Id, new MemberInput { Name = "one", PhoneNumber = Phone })).Succeeded);
+        Assert.True((await service.CreateAsync(customer.Id, new MemberInput { Name = "two", PhoneNumber = "09351234567", BaleId = "   " })).Succeeded);
+
+        var members = await service.GetByCustomerAsync(customer.Id);
+        Assert.Equal(2, members.Count);
+        Assert.All(members, m => Assert.Null(m.BaleId));
+    }
+
+    [Fact]
+    public async Task MemberService_PhoneNumberIsStoredTrimmed()
+    {
+        var customer = await AddCustomerAsync();
+        var service = Get<CustomerMemberService>();
+
+        var created = await service.CreateAsync(customer.Id, new MemberInput { Name = "x", PhoneNumber = "  ۰۹۱۲۱۲۳۴۵۶۷  " });
+
+        Assert.True(created.Succeeded);
+        Assert.Equal("۰۹۱۲۱۲۳۴۵۶۷", (await service.GetAsync(created.Value))!.PhoneNumber);
+    }
+
+    private const string Phone = "09121234567";
 
     [Fact]
     public async Task MemberService_MemberStaysWithItsCustomerWhenEdited()
@@ -317,7 +344,7 @@ public class SupportServicesTests : TestBase
         var a = await AddCustomerAsync("A");
         var member = await AddMemberAsync(a.Id, "5", "old");
 
-        await Get<CustomerMemberService>().UpdateAsync(member.Id, new MemberInput { Name = "new", BaleId = "5", PhoneNumber = "1" });
+        await Get<CustomerMemberService>().UpdateAsync(member.Id, new MemberInput { Name = "new", BaleId = "5", PhoneNumber = Phone });
 
         var loaded = await Get<CustomerMemberService>().GetAsync(member.Id);
         Assert.Equal(a.Id, loaded!.CustomerId);

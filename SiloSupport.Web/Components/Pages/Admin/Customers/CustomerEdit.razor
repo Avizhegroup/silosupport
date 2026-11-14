@@ -35,6 +35,14 @@ else
                 <TelerikTextArea @bind-Value="_model.Description" Width="100%" />
                 <ValidationMessage For="() => _model.Description" />
             </div>
+            <div class="form-row">
+                <label>شناسه چت بله مشتری (اختیاری)</label>
+                <div dir="ltr">
+                    <TelerikNumericTextBox @bind-Value="_model.BaleChatId" Format="0" Decimals="0" Arrows="false" Width="100%" />
+                </div>
+                <div class="hint">شناسه عددی چتی (معمولاً گروه) که افراد این مشتری در آن به ربات پیام می‌دهند. پیامی که فرستنده‌اش نه عضو تیم پشتیبانی است و نه عضو ثبت‌شده مشتری، به مشتریِ همین چت نسبت داده می‌شود. باید یکتا باشد.</div>
+                <ValidationMessage For="() => _model.BaleChatId" />
+            </div>
 
             <StatusBanner Message="@ErrorText" IsError="true" />
 
@@ -79,7 +87,7 @@ else
             return;
         }
 
-        _model = new CustomerInput { Name = customer.Name, Description = customer.Description };
+        _model = new CustomerInput { Name = customer.Name, Description = customer.Description, BaleChatId = customer.BaleChatId };
     }
 
     private async Task SaveAsync()

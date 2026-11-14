@@ -35,6 +35,8 @@ public class CustomerMessageProcessorTests
         _processor = new CustomerMessageProcessor(
             new FakeGroupRepository(_store),
             new FakeMemberRepository(_store),
+            new FakeCustomerRepository(_store),
+            new FakeSupportPersonRepository(_store),
             new FakeGroupedMessageRepository(_store),
             _bale,
             _classifier,
@@ -143,6 +145,95 @@ public class CustomerMessageProcessorTests
         Assert.Equal(MessageProcessingOutcome.Forwarded, await _processor.ProcessAsync(message, CancellationToken.None));
     }
 
+    private const long AcmeChat = 8888;
+
+    private void RegisterAcmeChat() => _store.Customers.Single(c => c.Id == 1).BaleChatId = AcmeChat;
+
+    [Theory]
+    [InlineData("@Support1", "support1")]
+    [InlineData("support1", "SUPPORT1")]
+    public async Task ProcessAsync_MessageFromASupportPerson_IsNotACustomerMessage(string stored, string incoming)
+    {
+        _store.SupportPersons.Add(new SupportPerson { Id = 1, Name = "Ali", PhoneNumber = "09121234567", BaleUsername = SiloSupport.Application.Helpers.BaleIdentity.Normalize(stored) });
+        RegisterAcmeChat();
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "I will check", chat: AcmeChat, username: incoming), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.IgnoredSupportPerson, outcome);
+        Assert.Empty(_classifier.Calls);
+        Assert.Empty(_bale.Sent);
+        Assert.Empty(_store.Messages);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SupportPersonWhoIsAlsoListedAsMember_IsStillIgnored()
+    {
+        _store.SupportPersons.Add(new SupportPerson { Id = 1, Name = "Ali", PhoneNumber = "09121234567", BaleUsername = "sara_support" });
+        _store.Members.Add(new CustomerMember { Id = 3, CustomerId = 1, BaleId = "@sara_support", Name = "Sara", PhoneNumber = "0" });
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "hello", username: "sara_support"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.IgnoredSupportPerson, outcome);
+        Assert.Empty(_bale.Sent);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UnregisteredSenderWithoutUserName_InACustomerChat_IsProcessedAsThatCustomersMessage()
+    {
+        RegisterAcmeChat();
+        ClassifyAs(GroupPriority.Critical);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "System is down", chat: AcmeChat), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Equal(new[] { "System is down" }, _classifier.Calls);
+        var sent = Assert.Single(_bale.Sent);
+        Assert.Equal(2003, sent.ChatId); // Acme's Critical group
+        Assert.Contains("Acme", sent.Text);
+        Assert.Contains(UnknownUser.ToString(), sent.Text);
+        Assert.Contains(sent.Text, _store.Messages.Select(m => m.Message));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UnregisteredSenderWithAUserName_ThatIsNotInTheCustomerTable_IsStillACustomerMessage()
+    {
+        RegisterAcmeChat();
+        ClassifyAs(GroupPriority.Medium);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "Slow reports", chat: AcmeChat, username: "newcomer"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Contains("@newcomer", Assert.Single(_bale.Sent).Text);
+        Assert.Single(_store.Messages);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_RegisteredMemberWinsOverTheChatOfAnotherCustomer()
+    {
+        RegisterAcmeChat();
+        ClassifyAs(GroupPriority.Low);
+
+        // Omid is a member of Beta but writes in Acme's chat: his own customer is used.
+        var outcome = await _processor.ProcessAsync(Text(BetaMember, "hello", chat: AcmeChat), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Equal(3001, _bale.Sent.Single().ChatId); // Beta's Low group
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UnregisteredSenderInAChatOfNoCustomer_IsIgnoredWithAHint()
+    {
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await _processor.ProcessAsync(Text(UnknownUser, "hello", chat: 12345, username: "stranger"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.IgnoredUnknownMember, outcome);
+        Assert.Empty(_bale.Sent);
+        Assert.True(_logger.Has(LogLevel.Information, "Bale chat id"));
+    }
+
     // 1
     [Fact]
     public async Task ProcessAsync_RegisteredMemberText_IsClassifiedAndForwarded()
@@ -206,7 +297,7 @@ public class CustomerMessageProcessorTests
         Assert.Equal(MessageProcessingOutcome.IgnoredUnknownMember, outcome);
         Assert.Empty(_classifier.Calls);
         Assert.Empty(_bale.Sent);
-        Assert.True(_logger.Has(LogLevel.Information, "not a registered customer member"));
+        Assert.True(_logger.Has(LogLevel.Information, "not the Bale chat of any customer"));
     }
 
     [Fact]

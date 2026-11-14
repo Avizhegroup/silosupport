@@ -198,22 +198,23 @@ public class MemberInputValidationTests
     [InlineData("  777  ")]
     [InlineData("@ali")]
     [InlineData("Ali_Support")]
-    public void BaleId_AcceptsTextIds(string baleId)
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void BaleId_AcceptsTextIds_AndMayBeEmpty(string? baleId)
     {
-        Assert.Empty(Validate(new MemberInput { Name = "Sara", BaleId = baleId }));
+        Assert.Empty(Validate(new MemberInput { Name = "Sara", PhoneNumber = "09121234567", BaleId = baleId }));
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
     [InlineData("0")]
     [InlineData("12 34")]
     [InlineData("@")]
     [InlineData("@@ali")]
     [InlineData("@ al")]
-    public void BaleId_RejectsEmptyZeroOrIdsContainingSpaces(string baleId)
+    public void BaleId_RejectsZeroOrIdsContainingSpacesOrBadAtSigns(string baleId)
     {
-        var errors = Validate(new MemberInput { Name = "Sara", BaleId = baleId });
+        var errors = Validate(new MemberInput { Name = "Sara", PhoneNumber = "09121234567", BaleId = baleId });
 
         Assert.NotEmpty(errors);
         Assert.All(errors, e => Assert.Contains("شناسه بله", e.ErrorMessage));
@@ -222,16 +223,37 @@ public class MemberInputValidationTests
     [Fact]
     public void BaleId_IsLimitedTo64Characters()
     {
-        Assert.Empty(Validate(new MemberInput { Name = "Sara", BaleId = new string('1', 64) }));
-        Assert.NotEmpty(Validate(new MemberInput { Name = "Sara", BaleId = new string('1', 65) }));
+        Assert.Empty(Validate(new MemberInput { Name = "Sara", PhoneNumber = "09121234567", BaleId = new string('1', 64) }));
+        Assert.NotEmpty(Validate(new MemberInput { Name = "Sara", PhoneNumber = "09121234567", BaleId = new string('1', 65) }));
     }
 
     [Fact]
     public void ValidationMessages_ArePersian()
     {
-        var errors = Validate(new MemberInput { Name = "", BaleId = "" });
+        var errors = Validate(new MemberInput { Name = "", PhoneNumber = "" });
 
         Assert.Contains(errors, e => e.ErrorMessage == "نام الزامی است.");
-        Assert.Contains(errors, e => e.ErrorMessage == "شناسه بله الزامی است.");
+        Assert.Contains(errors, e => e.ErrorMessage == "شماره تلفن الزامی است.");
+    }
+
+    [Theory]
+    [InlineData("09121234567")]
+    [InlineData("+98 912 123 4567")]
+    [InlineData("989121234567")]
+    [InlineData("۰۹۱۲۱۲۳۴۵۶۷")]
+    public void Phone_AcceptsCommonFormats(string phone)
+    {
+        Assert.Empty(Validate(new MemberInput { Name = "Sara", PhoneNumber = phone }));
+    }
+
+    [Theory]
+    [InlineData("0912")]
+    [InlineData("abc")]
+    [InlineData("1234567890123456")]
+    public void Phone_RejectsNumbersThatCannotBeUsedToIdentifyAPerson(string phone)
+    {
+        var errors = Validate(new MemberInput { Name = "Sara", PhoneNumber = phone });
+
+        Assert.Contains(errors, e => e.ErrorMessage!.Contains("شماره تلفن"));
     }
 }

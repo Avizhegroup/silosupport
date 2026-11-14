@@ -83,7 +83,22 @@ public class UiConventionTests
         Assert.Contains("Url = \"/\"", layout);
         Assert.Contains("Url = \"/admin/customers\"", layout);
         Assert.Contains("Url = \"/admin/conversations\"", layout);
+        Assert.Contains("Url = \"/admin/support-persons\"", layout);
         Assert.Contains("<AuthorizeView Roles=\"@AppRoles.Administrator\">", layout);
+    }
+
+    [Fact]
+    public void SupportPersonPages_ExistAndUseTelerikComponents()
+    {
+        var list = Read("Components", "Pages", "Admin", "SupportPersons", "SupportPersonList.razor");
+        var edit = Read("Components", "Pages", "Admin", "SupportPersons", "SupportPersonEdit.razor");
+
+        Assert.Contains("@page \"/admin/support-persons\"", list);
+        Assert.Contains("<TelerikGrid", list);
+        Assert.Contains("@page \"/admin/support-persons/new\"", edit);
+        Assert.Contains("@page \"/admin/support-persons/{Id:int}/edit\"", edit);
+        Assert.Contains("<TelerikTextBox", edit);
+        Assert.DoesNotContain("<input", edit);
     }
 
     [Fact]

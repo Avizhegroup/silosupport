@@ -54,9 +54,22 @@ public class CustomerRepository : ICustomerRepository
 
         existing.Name = customer.Name;
         existing.Description = customer.Description;
+        existing.BaleChatId = customer.BaleChatId;
         await _db.SaveChangesAsync(cancellationToken);
         _db.Entry(existing).State = EntityState.Detached;
         return true;
+    }
+
+    public Task<Customer?> GetByBaleChatIdAsync(long baleChatId, CancellationToken cancellationToken = default)
+    {
+        return _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.BaleChatId == baleChatId, cancellationToken);
+    }
+
+    public Task<bool> BaleChatIdExistsAsync(long baleChatId, int? excludeCustomerId, CancellationToken cancellationToken = default)
+    {
+        return _db.Customers.AnyAsync(
+            c => c.BaleChatId == baleChatId && (excludeCustomerId == null || c.Id != excludeCustomerId),
+            cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)

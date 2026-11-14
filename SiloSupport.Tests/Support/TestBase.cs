@@ -33,11 +33,13 @@ public abstract class TestBase : IDisposable
         services.AddSingleton<TimeProvider>(Clock);
         services.AddScoped<ITransactionRunner, EfTransactionRunner>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<ISupportPersonRepository, SupportPersonRepository>();
         services.AddScoped<ICustomerMemberRepository, CustomerMemberRepository>();
         services.AddScoped<ICustomerGroupRepository, CustomerGroupRepository>();
         services.AddScoped<ICustomerGroupedMessageRepository, CustomerGroupedMessageRepository>();
         services.AddScoped<CustomerService>();
         services.AddScoped<CustomerMemberService>();
+        services.AddScoped<SupportPersonService>();
         services.AddScoped<CustomerGroupService>();
         services.AddScoped<ConversationService>();
         services.AddScoped<DashboardService>();
@@ -74,7 +76,7 @@ public abstract class TestBase : IDisposable
         return group;
     }
 
-    protected async Task<CustomerMember> AddMemberAsync(int customerId, string baleId, string name = "Member")
+    protected async Task<CustomerMember> AddMemberAsync(int customerId, string? baleId, string name = "Member")
     {
         var member = new CustomerMember { CustomerId = customerId, BaleId = baleId, Name = name, Description = "", PhoneNumber = "0912" };
         await Get<ICustomerMemberRepository>().AddAsync(member);

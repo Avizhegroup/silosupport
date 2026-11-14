@@ -28,17 +28,20 @@ public class CustomerMemberRepository : ICustomerMemberRepository
         return _db.CustomerMembers.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<CustomerMember>> FindByBaleIdsAsync(IReadOnlyCollection<string> candidates, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CustomerMember>> FindBySenderAsync(long? senderId, string? username, CancellationToken cancellationToken = default)
     {
-        if (candidates.Count == 0)
-            return Array.Empty<CustomerMember>();
+        var lowered = BaleIdentity.CandidatesFor(senderId, username)
+            .Select(c => c.ToLowerInvariant())
+            .Distinct()
+            .ToList();
 
-        var lowered = candidates.Select(c => c.Trim().ToLowerInvariant()).Where(c => c.Length > 0).Distinct().ToList();
+        if (lowered.Count == 0)
+            return Array.Empty<CustomerMember>();
 
         return await _db.CustomerMembers
             .AsNoTracking()
             .Include(m => m.Customer)
-            .Where(m => lowered.Contains(m.BaleId.ToLower()))
+            .Where(m => m.BaleId != null && lowered.Contains(m.BaleId.ToLower()))
             .ToListAsync(cancellationToken);
     }
 
@@ -47,7 +50,7 @@ public class CustomerMemberRepository : ICustomerMemberRepository
         var variants = BaleIdentity.Variants(baleId).ToList();
 
         return _db.CustomerMembers.AnyAsync(
-            m => variants.Contains(m.BaleId.ToLower()) && (excludeMemberId == null || m.Id != excludeMemberId),
+            m => m.BaleId != null && variants.Contains(m.BaleId.ToLower()) && (excludeMemberId == null || m.Id != excludeMemberId),
             cancellationToken);
     }
 

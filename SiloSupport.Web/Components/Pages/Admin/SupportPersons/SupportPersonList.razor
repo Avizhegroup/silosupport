@@ -1,0 +1,95 @@
+@page "/admin/support-persons"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject SupportPersonService SupportPersons
+
+<PageTitle>تیم پشتیبانی</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>تیم پشتیبانی</h1>
+        <p class="page-sub">اعضای تیم پشتیبانی برای همه مشتریان یکسان‌اند. پیام‌های آن‌ها پیام مشتری حساب نمی‌شود.</p>
+    </div>
+    <LinkButton Href="/admin/support-persons/new" Primary="true">عضو جدید</LinkButton>
+</div>
+
+<StatusBanner Message="@_message" IsError="_isError" />
+
+@if (_items is null)
+{
+    <div class="loading-state">در حال بارگذاری…</div>
+}
+else if (_items.Count == 0)
+{
+    <div class="empty-state">
+        <TelerikSvgIcon Icon="@SvgIcon.User" />
+        <strong>هنوز عضوی از تیم پشتیبانی ثبت نشده است</strong>
+        <span>با دکمه «عضو جدید» اولین عضو را اضافه کنید؛ تا آن زمان همه فرستنده‌ها مشتری حساب می‌شوند.</span>
+    </div>
+}
+else
+{
+    <div class="panel">
+        <TelerikGrid Data="_items" TItem="SupportPersonDto" Sortable="true" Height="600px">
+            <GridColumns>
+                <GridColumn Field="@nameof(SupportPersonDto.Id)" Title="شناسه" Width="100px" />
+                <GridColumn Field="@nameof(SupportPersonDto.Name)" Title="نام" />
+                <GridColumn Field="@nameof(SupportPersonDto.PhoneNumber)" Title="شماره تلفن">
+                    <Template>
+                        @{ var p = (SupportPersonDto)context; }
+                        <bdi dir="ltr">@p.PhoneNumber</bdi>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(SupportPersonDto.BaleUsername)" Title="نام کاربری بله">
+                    <Template>
+                        @{ var p = (SupportPersonDto)context; }
+                        <bdi dir="ltr">&#64;@p.BaleUsername</bdi>
+                    </Template>
+                </GridColumn>
+                <GridColumn Title="عملیات" Width="220px" Sortable="false">
+                    <Template>
+                        @{ var p = (SupportPersonDto)context; }
+                        <div class="row-actions">
+                            <LinkButton Href="@($"/admin/support-persons/{p.Id}/edit")">ویرایش</LinkButton>
+                            <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Error" OnClick="@(() => AskDelete(p))">حذف</TelerikButton>
+                        </div>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </TelerikGrid>
+    </div>
+}
+
+<ConfirmDialog Visible="_toDelete is not null"
+               Title="حذف عضو تیم پشتیبانی"
+               Message="@($"«{_toDelete?.Name}» از تیم پشتیبانی حذف شود؟ پیام‌های بعدی این شخص پیام مشتری حساب می‌شود.")"
+               OnConfirm="DeleteAsync"
+               OnCancel="CancelDelete" />
+
+@code {
+    private List<SupportPersonDto>? _items;
+    private SupportPersonDto? _toDelete;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _items = (await SupportPersons.GetListAsync()).ToList();
+
+    private void AskDelete(SupportPersonDto person) => _toDelete = person;
+
+    private void CancelDelete() => _toDelete = null;
+
+    private async Task DeleteAsync()
+    {
+        var person = _toDelete;
+        _toDelete = null;
+        if (person is null)
+            return;
+
+        var result = await SupportPersons.DeleteAsync(person.Id);
+        _isError = !result.Succeeded;
+        _message = result.Succeeded ? "عضو تیم پشتیبانی حذف شد." : result.FirstError ?? "حذف انجام نشد.";
+
+        await LoadAsync();
+    }
+}

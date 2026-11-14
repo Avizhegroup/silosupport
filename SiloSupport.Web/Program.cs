@@ -44,6 +44,7 @@ builder.Services.ConfigureApplicationCookie(o =>
 //    SiloSupport.Service.CustomerSupport Windows service.
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<CustomerMemberService>();
+builder.Services.AddScoped<SupportPersonService>();
 builder.Services.AddScoped<CustomerGroupService>();
 builder.Services.AddScoped<ConversationService>();
 builder.Services.AddSingleton(TimeProvider.System);

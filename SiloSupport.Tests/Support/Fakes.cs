@@ -83,6 +83,7 @@ public sealed class FakeStore
 {
     public List<Customer> Customers { get; } = new();
     public List<CustomerMember> Members { get; } = new();
+    public List<SupportPerson> SupportPersons { get; } = new();
     public List<CustomerGroup> Groups { get; } = new();
     public List<CustomerGroupedMessage> Messages { get; } = new();
     public bool FailMessageInsert { get; set; }
@@ -94,12 +95,14 @@ public sealed class FakeMemberRepository : ICustomerMemberRepository
 
     public FakeMemberRepository(FakeStore store) => _store = store;
 
-    public Task<IReadOnlyList<CustomerMember>> FindByBaleIdsAsync(IReadOnlyCollection<string> candidates, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CustomerMember>> FindBySenderAsync(long? senderId, string? username, CancellationToken cancellationToken = default)
     {
-        var lowered = candidates.Select(c => c.ToLowerInvariant()).ToHashSet();
+        var lowered = SiloSupport.Application.Helpers.BaleIdentity.CandidatesFor(senderId, username)
+            .Select(c => c.ToLowerInvariant())
+            .ToHashSet();
 
         IReadOnlyList<CustomerMember> found = _store.Members
-            .Where(m => lowered.Contains(m.BaleId.ToLowerInvariant()))
+            .Where(m => m.BaleId is not null && lowered.Contains(m.BaleId.ToLowerInvariant()))
             .Select(member => new CustomerMember
             {
                 Id = member.Id,
@@ -120,6 +123,49 @@ public sealed class FakeMemberRepository : ICustomerMemberRepository
     public Task<bool> BaleIdExistsAsync(string baleId, int? excludeMemberId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task AddAsync(CustomerMember member, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> UpdateAsync(CustomerMember member, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}
+
+public sealed class FakeCustomerRepository : ICustomerRepository
+{
+    private readonly FakeStore _store;
+
+    public FakeCustomerRepository(FakeStore store) => _store = store;
+
+    public Task<Customer?> GetByBaleChatIdAsync(long baleChatId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_store.Customers
+            .Where(c => c.BaleChatId == baleChatId)
+            .Select(c => new Customer { Id = c.Id, Name = c.Name, Description = c.Description, BaleChatId = c.BaleChatId })
+            .FirstOrDefault());
+
+    public Task<IReadOnlyList<CustomerSummary>> GetSummariesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<Customer?> GetByIdAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task AddAsync(Customer customer, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> BaleChatIdExistsAsync(long baleChatId, int? excludeCustomerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> UpdateAsync(Customer customer, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> HasMessageHistoryAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}
+
+public sealed class FakeSupportPersonRepository : ISupportPersonRepository
+{
+    private readonly FakeStore _store;
+
+    public FakeSupportPersonRepository(FakeStore store) => _store = store;
+
+    public Task<SupportPerson?> FindByUsernameAsync(string? username, CancellationToken cancellationToken = default)
+    {
+        var normalized = SiloSupport.Application.Helpers.BaleIdentity.Normalize(username);
+        return Task.FromResult(normalized.Length == 0
+            ? null
+            : _store.SupportPersons.FirstOrDefault(s => s.BaleUsername == normalized));
+    }
+
+    public Task<IReadOnlyList<SupportPerson>> GetAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<SupportPerson?> GetByIdAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> UsernameExistsAsync(string username, int? excludeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task AddAsync(SupportPerson person, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> UpdateAsync(SupportPerson person, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 

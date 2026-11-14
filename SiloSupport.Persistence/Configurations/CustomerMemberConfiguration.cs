@@ -14,12 +14,13 @@ public class CustomerMemberConfiguration : IEntityTypeConfiguration<CustomerMemb
         builder.Property(m => m.Name).IsRequired().HasMaxLength(200);
         builder.Property(m => m.Description).IsRequired().HasMaxLength(1000);
         builder.Property(m => m.PhoneNumber).IsRequired().HasMaxLength(32);
-        builder.Property(m => m.BaleId).IsRequired().HasMaxLength(64);
+        builder.Property(m => m.BaleId).HasMaxLength(64);
         builder.Property(m => m.CustomerId).IsRequired();
 
         builder.HasIndex(m => m.CustomerId);
 
         // A Bale user identifies exactly one member, otherwise messages could not be attributed to one customer.
-        builder.HasIndex(m => m.BaleId).IsUnique();
+        // The Bale ID is optional, so the unique index only covers the rows that have a value.
+        builder.HasIndex(m => m.BaleId).IsUnique().HasFilter("[BaleId] IS NOT NULL");
     }
 }
