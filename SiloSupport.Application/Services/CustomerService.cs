@@ -44,7 +44,7 @@ public class CustomerService
     public async Task<CustomerDto?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
         var customer = await _customers.GetByIdAsync(id, cancellationToken);
-        return customer is null ? null : new CustomerDto(customer.Id, customer.Name, customer.Description);
+        return customer is null ? null : new CustomerDto(customer.Id, customer.Name, customer.Description, customer.BaleChatId);
     }
 
     /// <summary>Customer with its members and the configuration state of each priority group.</summary>
@@ -68,7 +68,7 @@ public class CustomerService
             .ToList();
 
         return new CustomerDetailsDto(
-            new CustomerDto(customer.Id, customer.Name, customer.Description),
+            new CustomerDto(customer.Id, customer.Name, customer.Description, customer.BaleChatId),
             members.Select(m => new MemberDto(m.Id, m.CustomerId, m.Name, m.Description, m.PhoneNumber, m.BaleId)).ToList(),
             statuses);
     }
@@ -79,7 +79,16 @@ public class CustomerService
         if (errors.Count > 0)
             return OperationResult<int>.Failure(errors);
 
-        var customer = new Customer { Name = input.Name.Trim(), Description = input.Description?.Trim() ?? string.Empty };
+        var chatError = await ValidateChatIdAsync(input.BaleChatId, null, cancellationToken);
+        if (chatError is not null)
+            return OperationResult<int>.Failure(chatError);
+
+        var customer = new Customer
+        {
+            Name = input.Name.Trim(),
+            Description = input.Description?.Trim() ?? string.Empty,
+            BaleChatId = input.BaleChatId
+        };
         await _customers.AddAsync(customer, cancellationToken);
         return OperationResult<int>.Success(customer.Id);
     }
@@ -90,11 +99,42 @@ public class CustomerService
         if (errors.Count > 0)
             return OperationResult.Failure(errors);
 
+        var chatError = await ValidateChatIdAsync(input.BaleChatId, id, cancellationToken);
+        if (chatError is not null)
+            return OperationResult.Failure(chatError);
+
         var updated = await _customers.UpdateAsync(
-            new Customer { Id = id, Name = input.Name.Trim(), Description = input.Description?.Trim() ?? string.Empty },
+            new Customer
+            {
+                Id = id,
+                Name = input.Name.Trim(),
+                Description = input.Description?.Trim() ?? string.Empty,
+                BaleChatId = input.BaleChatId
+            },
             cancellationToken);
 
         return updated ? OperationResult.Success() : OperationResult.Failure("مشتری دیگر وجود ندارد.");
+    }
+
+    /// <summary>
+    /// The chat id must be unique among customers and must not be one of the destination priority groups
+    /// (messages of those chats are never processed as customer messages). Null when it is fine.
+    /// </summary>
+    private async Task<string?> ValidateChatIdAsync(long? chatId, int? customerId, CancellationToken cancellationToken)
+    {
+        if (chatId is null)
+            return null;
+
+        if (chatId == 0)
+            return "شناسه چت بله نمی‌تواند ۰ باشد.";
+
+        if (await _customers.BaleChatIdExistsAsync(chatId.Value, customerId, cancellationToken))
+            return "مشتری دیگری با این شناسه چت بله ثبت شده است.";
+
+        if (await _groups.BaleIdExistsAsync(chatId.Value, null, cancellationToken))
+            return "این شناسه چت متعلق به یک گروه اولویت است و نمی‌تواند چت مشتری باشد.";
+
+        return null;
     }
 
     /// <summary>

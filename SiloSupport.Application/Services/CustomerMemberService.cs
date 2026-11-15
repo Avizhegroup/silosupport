@@ -37,7 +37,8 @@ public class CustomerMemberService
         if (await _customers.GetByIdAsync(customerId, cancellationToken) is null)
             return OperationResult<int>.Failure("مشتری دیگر وجود ندارد.");
 
-        if (await _members.BaleIdExistsAsync(input.BaleId.Trim(), null, cancellationToken))
+        var baleId = NormalizeBaleId(input.BaleId);
+        if (baleId is not null && await _members.BaleIdExistsAsync(baleId, null, cancellationToken))
             return OperationResult<int>.Failure("عضو دیگری با این شناسه بله ثبت شده است.");
 
         var member = new CustomerMember
@@ -46,7 +47,7 @@ public class CustomerMemberService
             Name = input.Name.Trim(),
             Description = input.Description?.Trim() ?? string.Empty,
             PhoneNumber = input.PhoneNumber?.Trim() ?? string.Empty,
-            BaleId = input.BaleId.Trim()
+            BaleId = baleId
         };
 
         await _members.AddAsync(member, cancellationToken);
@@ -62,7 +63,8 @@ public class CustomerMemberService
         if (await _members.GetByIdAsync(id, cancellationToken) is null)
             return OperationResult.Failure("عضو دیگر وجود ندارد.");
 
-        if (await _members.BaleIdExistsAsync(input.BaleId.Trim(), id, cancellationToken))
+        var baleId = NormalizeBaleId(input.BaleId);
+        if (baleId is not null && await _members.BaleIdExistsAsync(baleId, id, cancellationToken))
             return OperationResult.Failure("عضو دیگری با این شناسه بله ثبت شده است.");
 
         var updated = await _members.UpdateAsync(
@@ -72,7 +74,7 @@ public class CustomerMemberService
                 Name = input.Name.Trim(),
                 Description = input.Description?.Trim() ?? string.Empty,
                 PhoneNumber = input.PhoneNumber?.Trim() ?? string.Empty,
-                BaleId = input.BaleId.Trim()
+                BaleId = baleId
             },
             cancellationToken);
 
@@ -84,6 +86,10 @@ public class CustomerMemberService
         var deleted = await _members.DeleteAsync(id, cancellationToken);
         return deleted ? OperationResult.Success() : OperationResult.Failure("عضو دیگر وجود ندارد.");
     }
+
+    /// <summary>The trimmed Bale ID, or null when the administrator left it empty.</summary>
+    private static string? NormalizeBaleId(string? baleId) =>
+        string.IsNullOrWhiteSpace(baleId) ? null : baleId.Trim();
 
     private static MemberDto ToDto(CustomerMember m) =>
         new(m.Id, m.CustomerId, m.Name, m.Description, m.PhoneNumber, m.BaleId);

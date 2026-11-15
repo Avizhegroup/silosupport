@@ -1,0 +1,122 @@
+@page "/admin/support-persons/new"
+@page "/admin/support-persons/{Id:int}/edit"
+@attribute [Authorize(Roles = AppRoles.Administrator)]
+@inject SupportPersonService SupportPersons
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "عضو جدید تیم پشتیبانی" : "ویرایش عضو تیم پشتیبانی")</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@(IsNew ? "عضو جدید تیم پشتیبانی" : "ویرایش عضو تیم پشتیبانی")</h1>
+        @if (!IsNew)
+        {
+            <p class="page-sub">شناسه: <bdi dir="ltr">@Id</bdi></p>
+        }
+    </div>
+</div>
+
+@if (_notFound)
+{
+    <div class="banner banner-error">این عضو وجود ندارد.</div>
+    <LinkButton Href="/admin/support-persons">بازگشت به تیم پشتیبانی</LinkButton>
+}
+else if (_model is null)
+{
+    <div class="loading-state">در حال بارگذاری…</div>
+}
+else
+{
+    <div class="panel form-panel">
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="form-row">
+                <label>نام</label>
+                <TelerikTextBox @bind-Value="_model.Name" Width="100%" />
+                <ValidationMessage For="() => _model.Name" />
+            </div>
+            <div class="form-row">
+                <label>شماره تلفن</label>
+                <div dir="ltr">
+                    <TelerikTextBox @bind-Value="_model.PhoneNumber" Width="100%" />
+                </div>
+                <ValidationMessage For="() => _model.PhoneNumber" />
+            </div>
+            <div class="form-row">
+                <label>نام کاربری بله</label>
+                <div dir="ltr">
+                    <TelerikTextBox @bind-Value="_model.BaleUsername" Width="100%" />
+                </div>
+                <div class="hint">نام کاربری بله مثل <bdi dir="ltr">&#64;ali</bdi>. پیام‌هایی که با این نام کاربری ارسال شوند پیام مشتری حساب نمی‌شوند. حروف بزرگ و کوچک و علامت <bdi dir="ltr">&#64;</bdi> تأثیری ندارند و مقدار باید یکتا باشد.</div>
+                <ValidationMessage For="() => _model.BaleUsername" />
+            </div>
+
+            <StatusBanner Message="@ErrorText" IsError="true" />
+
+            <div class="form-actions">
+                <TelerikButton ButtonType="ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" Enabled="!_saving">ذخیره</TelerikButton>
+                <LinkButton Href="/admin/support-persons">انصراف</LinkButton>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private SupportPersonInput? _model;
+    private List<string> _errors = new();
+    private bool _saving;
+    private bool _notFound;
+
+    private string ErrorText => string.Join(" ", _errors);
+
+    private bool IsNew => Id is null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _errors.Clear();
+        _notFound = false;
+
+        if (IsNew)
+        {
+            _model = new SupportPersonInput();
+            return;
+        }
+
+        var person = await SupportPersons.GetAsync(Id!.Value);
+        if (person is null)
+        {
+            _model = null;
+            _notFound = true;
+            return;
+        }
+
+        _model = new SupportPersonInput { Name = person.Name, PhoneNumber = person.PhoneNumber, BaleUsername = person.BaleUsername };
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            var result = IsNew
+                ? (OperationResult)await SupportPersons.CreateAsync(_model!)
+                : await SupportPersons.UpdateAsync(Id!.Value, _model!);
+
+            if (!result.Succeeded)
+            {
+                _errors = result.Errors.ToList();
+                return;
+            }
+
+            Navigation.NavigateTo("/admin/support-persons");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

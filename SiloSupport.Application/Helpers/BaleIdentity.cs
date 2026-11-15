@@ -43,11 +43,11 @@ public static class BaleIdentity
     }
 
     /// <summary>True when the stored Bale ID of a member designates this numeric sender id.</summary>
-    public static bool IsNumericIdMatch(string storedBaleId, long senderId) =>
+    public static bool IsNumericIdMatch(string? storedBaleId, long senderId) =>
         Normalize(storedBaleId) == senderId.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>True when the stored Bale ID of a member designates this user name.</summary>
-    public static bool IsUsernameMatch(string storedBaleId, string? username)
+    public static bool IsUsernameMatch(string? storedBaleId, string? username)
     {
         var normalizedUsername = Normalize(username);
         return normalizedUsername.Length > 0 && Normalize(storedBaleId) == normalizedUsername;

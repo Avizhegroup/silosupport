@@ -17,6 +17,7 @@ public static class PersistenceServiceCollectionExtensions
 
         services.AddScoped<ITransactionRunner, EfTransactionRunner>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<ISupportPersonRepository, SupportPersonRepository>();
         services.AddScoped<ICustomerMemberRepository, CustomerMemberRepository>();
         services.AddScoped<ICustomerGroupRepository, CustomerGroupRepository>();
         services.AddScoped<ICustomerGroupedMessageRepository, CustomerGroupedMessageRepository>();

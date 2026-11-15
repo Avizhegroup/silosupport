@@ -10,11 +10,11 @@ public interface ICustomerMemberRepository
     Task<CustomerMember?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Finds the members whose stored Bale ID equals one of the lower-cased <paramref name="candidates"/>
-    /// (see <see cref="SiloSupport.Application.Helpers.BaleIdentity.CandidatesFor"/>), with
-    /// <see cref="CustomerMember.Customer"/> loaded. The comparison is case-insensitive.
+    /// Finds the members a Bale sender may be: the members whose stored Bale ID equals the numeric id or the user name
+    /// (ignoring case and a leading '@'; see <see cref="SiloSupport.Application.Helpers.BaleIdentity.CandidatesFor"/>).
+    /// <see cref="CustomerMember.Customer"/> is loaded.
     /// </summary>
-    Task<IReadOnlyList<CustomerMember>> FindByBaleIdsAsync(IReadOnlyCollection<string> candidates, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CustomerMember>> FindBySenderAsync(long? senderId, string? username, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// True when another member (ignoring <paramref name="excludeMemberId"/>) already uses the Bale ID, ignoring
@@ -24,7 +24,7 @@ public interface ICustomerMemberRepository
 
     Task AddAsync(CustomerMember member, CancellationToken cancellationToken = default);
 
-    /// <summary>Updates name, description, phone and Bale id. The owning customer never changes.</summary>
+    /// <summary>Updates name, description, phone and Bale ID. The owning customer never changes.</summary>
     Task<bool> UpdateAsync(CustomerMember member, CancellationToken cancellationToken = default);
 
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);

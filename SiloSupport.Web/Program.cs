@@ -1,10 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SiloSupport.Application.Services;
 using SiloSupport.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using SiloSupport.Web.Components;
-using SiloSupport.Web.Extensions;
 using SiloSupport.Web.Localization;
 using SiloSupport.Web.Security;
 using Telerik.Blazor.Services;
@@ -35,7 +34,9 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.AccessDeniedPath = "/Account/AccessDenied";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
-    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
     o.ExpireTimeSpan = TimeSpan.FromDays(7);
 });
 
@@ -43,16 +44,14 @@ builder.Services.ConfigureApplicationCookie(o =>
 //    SiloSupport.Service.CustomerSupport Windows service.
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<CustomerMemberService>();
+builder.Services.AddScoped<SupportPersonService>();
 builder.Services.AddScoped<CustomerGroupService>();
 builder.Services.AddScoped<ConversationService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<DashboardService>();
 
 // 4. Blazor + Telerik UI for Blazor.
-builder.Services.AddRazorComponents(options =>
-{
-    options.DetailedErrors = true;
-}).AddInteractiveServerComponents();
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization(options =>
 {
@@ -63,7 +62,7 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddTelerikBlazor();
 builder.Services.AddSingleton(typeof(ITelerikStringLocalizer), typeof(TelerikPersianLocalizer));
-builder.Services.AddSiloSerilog(builder.Configuration);
+
 var app = builder.Build();
 
 // 5. Migrate, seed roles and administrator.
@@ -110,7 +109,6 @@ app.MapGet("/Account/LogoutPost", async (HttpContext http, SignInManager<Applica
     return Results.Redirect("/Account/Login");
 }).AllowAnonymous();
 
-app.MapStaticAssets().AllowAnonymous();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();

@@ -13,6 +13,9 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.Property(c => c.Name).IsRequired().HasMaxLength(200);
         builder.Property(c => c.Description).IsRequired().HasMaxLength(1000);
+        builder.Property(c => c.BaleChatId);
+
+        builder.HasIndex(c => c.BaleChatId).IsUnique().HasFilter("[BaleChatId] IS NOT NULL");
 
         // Members are plain configuration data and go away with the customer. Groups are cascaded too, but the
         // Restrict on CustomerGroupedMessage -> CustomerGroup stops the delete when message history exists.

@@ -7,14 +7,16 @@ using SiloSupport.Domain.Entities;
 namespace SiloSupport.Service.CustomerSupport.Services;
 
 /// <summary>
-/// Processes one incoming Bale message: filters it, identifies the customer member, asks the AI API for a
-/// priority, forwards the original text plus the AI analysis to the customer's destination group for that priority
+/// Processes one incoming Bale message: filters it (messages of support persons are never customer messages),
+/// resolves the customer, asks the AI API for a priority, forwards the original text plus the AI analysis to the customer's destination group for that priority
 /// and records the forwarded text. It never replies to the originating chat.
 /// </summary>
 public class CustomerMessageProcessor
 {
     private readonly ICustomerGroupRepository _groups;
     private readonly ICustomerMemberRepository _members;
+    private readonly ICustomerRepository _customers;
+    private readonly ISupportPersonRepository _supportPersons;
     private readonly ICustomerGroupedMessageRepository _groupedMessages;
     private readonly IBaleBotClient _bale;
     private readonly IMessagePriorityClassifier _classifier;
@@ -24,6 +26,8 @@ public class CustomerMessageProcessor
     public CustomerMessageProcessor(
         ICustomerGroupRepository groups,
         ICustomerMemberRepository members,
+        ICustomerRepository customers,
+        ISupportPersonRepository supportPersons,
         ICustomerGroupedMessageRepository groupedMessages,
         IBaleBotClient bale,
         IMessagePriorityClassifier classifier,
@@ -32,6 +36,8 @@ public class CustomerMessageProcessor
     {
         _groups = groups;
         _members = members;
+        _customers = customers;
+        _supportPersons = supportPersons;
         _groupedMessages = groupedMessages;
         _bale = bale;
         _classifier = classifier;
@@ -57,6 +63,13 @@ public class CustomerMessageProcessor
             return MessageProcessingOutcome.IgnoredBotSender;
         }
 
+        // 3b. Messages written by our own support persons (recognised by Bale user name) are not customer messages.
+        if (await _supportPersons.FindByUsernameAsync(message.SenderUsername, cancellationToken) is not null)
+        {
+            _logger.LogDebug("Ignoring Bale message {MessageId}: sent by a support person", message.MessageId);
+            return MessageProcessingOutcome.IgnoredSupportPerson;
+        }
+
         // 4. Only ordinary text messages are supported in this phase (no voice, images, files, ...).
         if (message.HasNonTextContent || message.Text is null)
         {
@@ -73,31 +86,15 @@ public class CustomerMessageProcessor
             return MessageProcessingOutcome.IgnoredEmptyText;
         }
 
-        // 6-8. Identify the sender, find the registered member and resolve the customer. Administrators register a
-        //      member by Bale user name ("@ali") or by numeric id, so both of the sender's identifiers are tried.
-        var candidates = BaleIdentity.CandidatesFor(message.SenderId, message.SenderUsername);
-        if (candidates.Count == 0)
-        {
-            _logger.LogInformation("Ignoring Bale message {MessageId}: Bale sent neither a sender id nor a user name", message.MessageId);
+        // 6-8. Resolve the customer. Every sender who is not a support person is a customer; the customer is the
+        //      registered member's customer (matched by Bale user name or numeric id) or, for senders nobody
+        //      registered, the customer whose Bale chat the message came from.
+        var sender = await ResolveSenderAsync(message, cancellationToken);
+        if (sender is null)
             return MessageProcessingOutcome.IgnoredUnknownMember;
-        }
 
-        var matches = await _members.FindByBaleIdsAsync(candidates, cancellationToken);
-        var member = SelectMember(matches, message);
-        if (member is null)
-        {
-            var shownId = message.SenderId?.ToString() ?? "-";
-            var shownUsername = string.IsNullOrWhiteSpace(message.SenderUsername) ? "-" : "@" + message.SenderUsername.Trim().TrimStart('@');
-            _logger.LogInformation(
-                "Ignoring Bale message {MessageId}: sender (id {SenderId}, user name {SenderUsername}) is not a registered customer member. " +
-                "Register the member with Bale ID {RegisterAs}",
-                message.MessageId, shownId, shownUsername,
-                shownUsername == "-" ? shownId : $"'{shownUsername}' (or the numeric id {shownId})");
-            return MessageProcessingOutcome.IgnoredUnknownMember;
-        }
-
-        var customerId = member.CustomerId;
-        var customerName = member.Customer?.Name ?? string.Empty;
+        var customerId = sender.CustomerId;
+        var customerName = sender.CustomerName;
 
         // 9-10. Ask the AI API for the priority. Failures are logged and stop processing of this message.
         PriorityClassificationResult classification;
@@ -138,8 +135,8 @@ public class CustomerMessageProcessor
         // 12. Format the original message and the actual AI analysis.
         var text = ForwardedMessageFormatter.Format(new ForwardedMessageContext(
             customerName,
-            member.Name,
-            member.PhoneNumber,
+            sender.SenderName,
+            sender.SenderPhoneNumber,
             classification.Priority,
             message.Text,
             classification.Analysis));
@@ -201,15 +198,46 @@ public class CustomerMessageProcessor
         return MessageProcessingOutcome.Forwarded;
     }
 
+    private sealed record ResolvedSender(int CustomerId, string CustomerName, string SenderName, string SenderPhoneNumber);
+
+    private async Task<ResolvedSender?> ResolveSenderAsync(IncomingBaleMessage message, CancellationToken cancellationToken)
+    {
+        // a) A registered member (user name or numeric id).
+        var matches = await _members.FindBySenderAsync(message.SenderId, message.SenderUsername, cancellationToken);
+        var (member, ambiguous) = SelectMember(matches, message);
+        if (ambiguous)
+            return null;
+
+        if (member is not null)
+            return new ResolvedSender(member.CustomerId, member.Customer?.Name ?? string.Empty, member.Name, member.PhoneNumber);
+
+        // b) Not registered: the customer owning the chat the message came from.
+        var customer = await _customers.GetByBaleChatIdAsync(message.ChatId, cancellationToken);
+        var shownId = message.SenderId?.ToString() ?? "-";
+        var shownUsername = string.IsNullOrWhiteSpace(message.SenderUsername) ? "-" : "@" + message.SenderUsername.Trim().TrimStart('@');
+
+        if (customer is null)
+        {
+            _logger.LogInformation(
+                "Ignoring Bale message {MessageId}: the sender (id {SenderId}, user name {SenderUsername}) is not a support person or a registered member, " +
+                "and chat {ChatId} is not the Bale chat of any customer. Register the member, or set the customer's Bale chat id",
+                message.MessageId, shownId, shownUsername, message.ChatId);
+            return null;
+        }
+
+        var senderName = shownUsername != "-" ? shownUsername : shownId != "-" ? shownId : "ناشناس";
+        return new ResolvedSender(customer.Id, customer.Name, senderName, string.Empty);
+    }
+
     /// <summary>
     /// A match by numeric sender id wins over a match by user name (ids never change, user names can). When the best
     /// matches belong to different customers the message is not routed at all: sending a customer's text to another
     /// customer's group would be worse than ignoring it.
     /// </summary>
-    private CustomerMember? SelectMember(IReadOnlyList<CustomerMember> matches, IncomingBaleMessage message)
+    private (CustomerMember? Member, bool Ambiguous) SelectMember(IReadOnlyList<CustomerMember> matches, IncomingBaleMessage message)
     {
         if (matches.Count == 0)
-            return null;
+            return (null, false);
 
         var byId = message.SenderId is null
             ? new List<CustomerMember>()
@@ -220,17 +248,17 @@ public class CustomerMessageProcessor
             : matches.Where(m => BaleIdentity.IsUsernameMatch(m.BaleId, message.SenderUsername)).ToList();
 
         if (best.Count == 0)
-            return null;
+            return (null, false);
 
         if (best.Select(m => m.CustomerId).Distinct().Count() > 1)
         {
             _logger.LogWarning(
                 "Ignoring Bale message {MessageId}: the sender matches members of several customers ({CustomerIds}); fix the duplicate Bale IDs",
                 message.MessageId, string.Join(", ", best.Select(m => m.CustomerId).Distinct()));
-            return null;
+            return (null, true);
         }
 
-        return best.OrderBy(m => m.Id).First();
+        return (best.OrderBy(m => m.Id).First(), false);
     }
 
     private async Task<bool> IsOwnBotAsync(long? senderId, CancellationToken cancellationToken)

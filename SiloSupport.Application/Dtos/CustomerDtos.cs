@@ -10,7 +10,7 @@ public sealed record CustomerSummary(
     int MemberCount,
     IReadOnlyList<GroupPriority> ConfiguredPriorities);
 
-public sealed record CustomerDto(int Id, string Name, string Description);
+public sealed record CustomerDto(int Id, string Name, string Description, long? BaleChatId = null);
 
 /// <summary>Row of the customer list, including which priority groups are still missing.</summary>
 public sealed record CustomerListItemDto(
@@ -21,7 +21,11 @@ public sealed record CustomerListItemDto(
     int GroupCount,
     IReadOnlyList<GroupPriority> MissingPriorities);
 
-public sealed record MemberDto(int Id, int CustomerId, string Name, string Description, string PhoneNumber, string BaleId);
+/// <param name="BaleId">Optional Bale user name or numeric id entered by an administrator.</param>
+public sealed record MemberDto(int Id, int CustomerId, string Name, string Description, string PhoneNumber, string? BaleId);
+
+/// <param name="BaleUsername">Normalized Bale user name (no '@', lower case).</param>
+public sealed record SupportPersonDto(int Id, string Name, string PhoneNumber, string BaleUsername);
 
 public sealed record GroupDto(int Id, int CustomerId, string Name, long BaleId, GroupPriority Priority);
 

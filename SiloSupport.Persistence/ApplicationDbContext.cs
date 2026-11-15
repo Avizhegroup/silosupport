@@ -14,6 +14,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<Customer> Customers => Set<Customer>();
 
+    public DbSet<SupportPerson> SupportPersons => Set<SupportPerson>();
+
     public DbSet<CustomerMember> CustomerMembers => Set<CustomerMember>();
 
     public DbSet<CustomerGroup> CustomerGroups => Set<CustomerGroup>();

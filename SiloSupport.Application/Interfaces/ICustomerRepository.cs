@@ -13,7 +13,13 @@ public interface ICustomerRepository
     /// <summary>Inserts the customer; <see cref="Customer.Id"/> is populated afterwards.</summary>
     Task AddAsync(Customer customer, CancellationToken cancellationToken = default);
 
-    /// <summary>Updates name and description. Returns false when the customer does not exist.</summary>
+    /// <summary>The customer whose <see cref="Customer.BaleChatId"/> is the given chat, or null.</summary>
+    Task<Customer?> GetByBaleChatIdAsync(long baleChatId, CancellationToken cancellationToken = default);
+
+    /// <summary>True when another customer (ignoring <paramref name="excludeCustomerId"/>) already uses the Bale chat id.</summary>
+    Task<bool> BaleChatIdExistsAsync(long baleChatId, int? excludeCustomerId, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates name, description and Bale chat id. Returns false when the customer does not exist.</summary>
     Task<bool> UpdateAsync(Customer customer, CancellationToken cancellationToken = default);
 
     /// <summary>Deletes the customer. Returns false when it does not exist.</summary>

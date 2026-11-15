@@ -42,15 +42,20 @@ Updates arrive through **long polling** (`getUpdates`), the same mechanism `Silo
 
 1. If the originating chat id equals the Bale id of **any** configured `CustomerGroup` → ignore (logged).
 2. If the sender is flagged `is_bot`, or equals the bot's own id (`getMe`, cached) → ignore.
-3. If the message carries anything other than plain text (voice, audio, photo, document, video, sticker, ...) → ignore
+3. If the sender's Bale user name belongs to a **support person** (`SupportPersons.BaleUsername`, ignoring case and a
+   leading `@`) → ignore: our own team's messages are never customer messages. **Every other sender is a customer.**
+4. If the message carries anything other than plain text (voice, audio, photo, document, video, sticker, ...) → ignore
    (logged). Nothing is downloaded or transcribed.
-4. Empty / whitespace-only text → ignore.
-5. Find the `CustomerMember` by the sender's Bale id; none → ignore (logged). The customer comes from the member.
-6. Ask the AI API for the priority (see below). Failure / invalid / unsupported priority → log, stop. No fallback.
-7. Resolve the destination group for **that customer and that priority**. Missing → log, stop.
-8. Format the text (customer, sender, priority, original message, AI analysis when returned).
-9. `sendMessage` to the destination group. Failure → log, **no record is written**.
-10. After a successful send, store a `CustomerGroupedMessage` with the exact sent text, the group's internal id,
+5. Empty / whitespace-only text → ignore.
+6. Resolve the customer: (a) a registered `CustomerMember` whose Bale ID equals the sender's numeric id or user name
+   wins, even when the message came from another customer's chat; (b) otherwise the customer whose
+   `Customers.BaleChatId` is the chat the message came from, so senders without a user name, or nobody registered, are
+   still processed; (c) otherwise ignore (logged with a hint to register the member or set the customer's chat id).
+7. Ask the AI API for the priority (see below). Failure / invalid / unsupported priority → log, stop. No fallback.
+8. Resolve the destination group for **that customer and that priority**. Missing → log, stop.
+9. Format the text (customer, sender, priority, original message, AI analysis when returned).
+10. `sendMessage` to the destination group. Failure → log, **no record is written**.
+11. After a successful send, store a `CustomerGroupedMessage` with the exact sent text, the group's internal id,
     `IsResolved = false` and a UTC timestamp. A database failure at this point is logged (the message is in Bale but
     not in the history).
 
@@ -70,9 +75,11 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 
 ## Data model and constraints
 
-- `CustomerMember.BaleId`: **text** (`nvarchar(64)`, trimmed). Administrators enter the Bale **user name** (`@ali`) or the numeric Bale user id. An incoming message is matched on the numeric `from.id` **or** the `from.username`, ignoring case and a leading `@` (`@Ali`, `ali` and `ALI` are the same). A numeric id match wins over a user name match. If the match spans members of more than one customer, the message is ignored with a warning. Bale messages never carry the sender's phone number, so the phone number cannot be used for matching. A member without a Bale user name must be registered by numeric id; the console log of an ignored message prints both the id and the user name to copy.
+- `SupportPerson` (`SupportPersons`): `Id`, `Name`, `PhoneNumber`, `BaleUsername` (stored normalized: no `@`, lower case; unique). The team is shared by all customers and managed on `/admin/support-persons`.
+- `Customer.BaleChatId`: optional `long`, unique when set (filtered index). The Bale chat (usually a group) where a customer's people write; it must not be one of the priority groups.
+- `CustomerMember.PhoneNumber` is required (at least 10 digits; Persian digits accepted). `CustomerMember.BaleId` is **optional** (people without a Bale user name). When set it is **text** (`nvarchar(64)`, trimmed). Administrators enter the Bale **user name** (`@ali`) or the numeric Bale user id. An incoming message is matched on the numeric `from.id` **or** the `from.username`, ignoring case and a leading `@` (`@Ali`, `ali` and `ALI` are the same). A numeric id match wins over a user name match. If the match spans members of more than one customer, the message is ignored with a warning. Bale messages never carry the sender's phone number, so it cannot be used for matching; members without a Bale ID are covered by the customer's chat id (flow step 6b).
 - `CustomerGroup.BaleId`: `long` (chat ids can exceed 32 bits, up to 52 significant bits).
-- Unique: `CustomerMembers.BaleId`; `CustomerGroups.BaleId`; `CustomerGroups(CustomerId, Priority)`.
+- Unique: `SupportPersons.BaleUsername`; `Customers.BaleChatId` and `CustomerMembers.BaleId` (only non-NULL values); `CustomerGroups.BaleId`; `CustomerGroups(CustomerId, Priority)`.
 - `CustomerGroups.Priority` is stored as text (`Low`/`Medium`/`Critical`).
 - `CustomerGroupedMessages.GroupId → CustomerGroups` is `Restrict`: groups and customers with history cannot be
   deleted (the services check first and show a message; the database enforces it). Members and groups without
@@ -89,6 +96,7 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 | `/admin/customers/{id}` | details: members, the three priority slots, missing-group warning |
 | `/admin/customers/{id}/members/new`, `/{memberId}/edit` | member form (customer shown explicitly) |
 | `/admin/customers/{id}/groups/new`, `/{groupId}/edit` | destination group form |
+| `/admin/support-persons`, `/new`, `/{id}/edit` | support team: list (Id, name, phone, Bale user name), create, edit, delete |
 | `/admin/conversations[/{customerId}]` | forwarded messages of one customer, per group, oldest first, resolve switch |
 
 The pages only use Application services. The conversations page loads one customer's messages with a database filter.
@@ -117,7 +125,7 @@ static server-rendered pages (they post a form), so they use plain inputs styled
 ### Sidebar and authorization
 
 - The sidebar (`TelerikDrawer` in `MainLayout.razor`) is rendered only inside `AuthorizeView Roles="Administrator"`:
-  Dashboard (`/`), Customers, Conversations.
+  Dashboard (`/`), Customers, Conversations, Support team.
 - Application level: a fallback authorization policy requires an authenticated user for every endpoint that is not
   explicitly `[AllowAnonymous]` (login / access denied pages, login and logout endpoints).
 - Role level: every admin page, including the dashboard, has `[Authorize(Roles = "Administrator")]`; users without the
@@ -184,12 +192,16 @@ Edit `appsettings.json` next to the published executable (connection string, bot
 The **Web project owns and applies the migrations** at startup (`Database.MigrateAsync()`); the Windows service never
 migrates, so start the Web site (or run `dotnet ef database update`) before the service.
 
-Migrations (both written by hand together with the model snapshot):
+Migrations (all written by hand together with the model snapshot):
 
 1. `20261027090000_InitialCreate` – Identity + support tables.
 2. `20261028100000_MemberBaleIdAsString` – `CustomerMembers.BaleId` from `bigint` to `nvarchar(64)`; existing numeric ids are
    converted to their text, the unique index is recreated. SQL Server uses `AlterColumn`; the SQLite branch (tests only)
    replaces the column with plain SQL. `Down` converts back and fails if a member has a non-numeric id.
+3. `20261103100000_MemberBaleIdOptional` – `CustomerMembers.BaleId` becomes nullable (empty values become NULL) and its
+   unique index is filtered to non-NULL values. `Down` gives such members a `member-<id>` placeholder.
+4. `20261115100000_SupportPersonsAndCustomerChat` – new `SupportPersons` table (unique `BaleUsername`) and the nullable
+   `Customers.BaleChatId` with a filtered unique index.
 
 They were written by hand because it was authored in an environment without the .NET SDK. Before relying on it, from the
 solution root run:
