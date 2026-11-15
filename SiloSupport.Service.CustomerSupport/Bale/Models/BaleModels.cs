@@ -43,9 +43,62 @@ public class BaleChat
     public string? Type { get; set; }
 }
 
+/// <summary>Bale Video / Voice / Audio / Document / Animation object (the fields the bot needs).</summary>
+public class BaleFileInfo
+{
+    [JsonPropertyName("file_id")]
+    public string? FileId { get; set; }
+
+    [JsonPropertyName("file_unique_id")]
+    public string? FileUniqueId { get; set; }
+
+    [JsonPropertyName("file_name")]
+    public string? FileName { get; set; }
+
+    [JsonPropertyName("mime_type")]
+    public string? MimeType { get; set; }
+
+    /// <summary>Size in bytes; Bale documents it as up to 52 significant bits, so it is a long.</summary>
+    [JsonPropertyName("file_size")]
+    public long? FileSize { get; set; }
+}
+
+/// <summary>One size of a Bale photo (the message carries several sizes of the same picture).</summary>
+public class BalePhotoSize
+{
+    [JsonPropertyName("file_id")]
+    public string? FileId { get; set; }
+
+    [JsonPropertyName("file_unique_id")]
+    public string? FileUniqueId { get; set; }
+
+    [JsonPropertyName("width")]
+    public int? Width { get; set; }
+
+    [JsonPropertyName("height")]
+    public int? Height { get; set; }
+
+    [JsonPropertyName("file_size")]
+    public long? FileSize { get; set; }
+}
+
+/// <summary>Result of getFile: where the file can be downloaded from (valid for one hour).</summary>
+public class BaleFile
+{
+    [JsonPropertyName("file_id")]
+    public string? FileId { get; set; }
+
+    [JsonPropertyName("file_size")]
+    public long? FileSize { get; set; }
+
+    [JsonPropertyName("file_path")]
+    public string? FilePath { get; set; }
+}
+
 /// <summary>
-/// Bale "Message" object reduced to the fields the routing flow needs. Media fields are kept as raw JSON only so
-/// their presence can be detected; media is never downloaded or analysed.
+/// Bale "Message" object reduced to the fields the routing flow needs. Photos, videos, voice messages, audio files,
+/// documents and animations are read as files (downloaded and forwarded); stickers, contacts, locations and invoices
+/// are only detected, they are not supported.
 /// </summary>
 public class BaleMessage
 {
@@ -61,26 +114,30 @@ public class BaleMessage
     [JsonPropertyName("text")]
     public string? Text { get; set; }
 
+    /// <summary>The caption of a photo, video, voice message, audio file, document or animation.</summary>
+    [JsonPropertyName("caption")]
+    public string? Caption { get; set; }
+
     [JsonPropertyName("animation")]
-    public JsonElement? Animation { get; set; }
+    public BaleFileInfo? Animation { get; set; }
 
     [JsonPropertyName("audio")]
-    public JsonElement? Audio { get; set; }
+    public BaleFileInfo? Audio { get; set; }
 
     [JsonPropertyName("document")]
-    public JsonElement? Document { get; set; }
+    public BaleFileInfo? Document { get; set; }
 
     [JsonPropertyName("photo")]
-    public JsonElement? Photo { get; set; }
+    public List<BalePhotoSize>? Photo { get; set; }
 
     [JsonPropertyName("sticker")]
     public JsonElement? Sticker { get; set; }
 
     [JsonPropertyName("video")]
-    public JsonElement? Video { get; set; }
+    public BaleFileInfo? Video { get; set; }
 
     [JsonPropertyName("voice")]
-    public JsonElement? Voice { get; set; }
+    public BaleFileInfo? Voice { get; set; }
 
     [JsonPropertyName("contact")]
     public JsonElement? Contact { get; set; }
@@ -91,10 +148,11 @@ public class BaleMessage
     [JsonPropertyName("invoice")]
     public JsonElement? Invoice { get; set; }
 
-    /// <summary>True when any non-text payload is present.</summary>
+    /// <summary>True when any non-text payload (file or otherwise) is present.</summary>
     public bool HasNonTextContent =>
-        Present(Animation) || Present(Audio) || Present(Document) || Present(Photo) || Present(Sticker)
-        || Present(Video) || Present(Voice) || Present(Contact) || Present(Location) || Present(Invoice);
+        Animation is not null || Audio is not null || Document is not null || Photo is { Count: > 0 }
+        || Video is not null || Voice is not null
+        || Present(Sticker) || Present(Contact) || Present(Location) || Present(Invoice);
 
     private static bool Present(JsonElement? element) =>
         element is { ValueKind: not JsonValueKind.Null and not JsonValueKind.Undefined };
@@ -108,6 +166,13 @@ public class BaleUpdate
 
     [JsonPropertyName("message")]
     public BaleMessage? Message { get; set; }
+}
+
+/// <summary>Body of the documented getFile call.</summary>
+public class BaleGetFileRequest
+{
+    [JsonPropertyName("file_id")]
+    public string FileId { get; set; } = string.Empty;
 }
 
 /// <summary>Body of the documented sendMessage call.</summary>

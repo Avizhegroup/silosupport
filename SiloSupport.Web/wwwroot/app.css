@@ -94,6 +94,21 @@ h1, h2, h3 { font-weight: 700; }
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .message-text { white-space: pre-wrap; word-break: break-word; line-height: 1.9; }
 
+/* ---------- issue threads and files ---------- */
+.thread { border-inline-start: 4px solid var(--line); }
+.thread-open { border-inline-start-color: var(--brand); }
+.thread-closed { opacity: .85; }
+.thread-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.thread-message { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fcfcfe; }
+.thread-message-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; font-size: .85rem; }
+.attachment { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; background: #fff; }
+.attachment-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; font-size: .85rem; }
+.attachment-kind { font-weight: 700; }
+.attachment-image { display: block; max-width: min(100%, 420px); max-height: 320px; border-radius: 8px; border: 1px solid var(--line); }
+.attachment-video { display: block; max-width: min(100%, 520px); max-height: 360px; border-radius: 8px; background: #000; }
+.attachment-audio { display: block; width: min(100%, 420px); }
+.attachment-actions { margin-top: 8px; }
+
 /* ---------- dashboard ---------- */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .stat-tile { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }

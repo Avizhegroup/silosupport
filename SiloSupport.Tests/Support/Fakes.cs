@@ -43,6 +43,16 @@ public sealed class FakeBaleClient : IBaleBotClient
 
     public List<(long ChatId, string Text)> Sent { get; } = new();
 
+    /// <summary>Files re-sent by file id (sendPhoto, sendVideo, ...), with the caption.</summary>
+    public List<(long ChatId, AttachmentKind Kind, string FileId, string? Caption)> SentAttachments { get; } = new();
+
+    public bool SendAttachmentResult { get; set; } = true;
+
+    /// <summary>What <see cref="DownloadFileAsync"/> returns; null simulates an unavailable or too-large file.</summary>
+    public BaleDownloadedFile? Download { get; set; } = new(new byte[] { 1, 2, 3 }, "photos/file_1.jpg");
+
+    public List<string> Downloads { get; } = new();
+
     public Task<IReadOnlyList<BalePolledUpdate>> GetUpdatesAsync(long offset, int timeoutSeconds, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<BalePolledUpdate>>(Array.Empty<BalePolledUpdate>());
 
@@ -58,6 +68,23 @@ public sealed class FakeBaleClient : IBaleBotClient
 
         return Task.FromResult(SendResult);
     }
+
+    public Task<bool> SendAttachmentAsync(long chatId, AttachmentKind kind, string fileId, string? caption, CancellationToken cancellationToken)
+    {
+        if (ThrowOnSend)
+            throw new HttpRequestException("boom");
+
+        if (SendAttachmentResult)
+            SentAttachments.Add((chatId, kind, fileId, caption));
+
+        return Task.FromResult(SendAttachmentResult);
+    }
+
+    public Task<BaleDownloadedFile?> DownloadFileAsync(string fileId, long maxBytes, CancellationToken cancellationToken)
+    {
+        Downloads.Add(fileId);
+        return Task.FromResult(Download);
+    }
 }
 
 public sealed class FakeClassifier : IMessagePriorityClassifier
@@ -68,9 +95,13 @@ public sealed class FakeClassifier : IMessagePriorityClassifier
 
     public List<string> Calls { get; } = new();
 
-    public Task<PriorityClassificationResult> ClassifyAsync(string customerMessage, CancellationToken cancellationToken)
+    /// <summary>The open issues offered to the AI on each call.</summary>
+    public List<IReadOnlyList<ThreadContextDto>> ThreadContexts { get; } = new();
+
+    public Task<PriorityClassificationResult> ClassifyAsync(string customerMessage, IReadOnlyList<ThreadContextDto> openThreads, CancellationToken cancellationToken)
     {
         Calls.Add(customerMessage);
+        ThreadContexts.Add(openThreads);
         if (Throw)
             throw new InvalidOperationException("AI down");
 
@@ -86,6 +117,8 @@ public sealed class FakeStore
     public List<SupportPerson> SupportPersons { get; } = new();
     public List<CustomerGroup> Groups { get; } = new();
     public List<CustomerGroupedMessage> Messages { get; } = new();
+    public List<SupportThread> Threads { get; } = new();
+    public List<MessageAttachment> Attachments { get; } = new();
     public bool FailMessageInsert { get; set; }
 }
 
@@ -204,14 +237,54 @@ public sealed class FakeGroupedMessageRepository : ICustomerGroupedMessageReposi
         if (_store.FailMessageInsert)
             throw new InvalidOperationException("db down");
 
+        var id = _store.Messages.Count + 1;
+        var threadId = message.ThreadId;
+        if (message.Thread is not null)
+        {
+            var thread = new SupportThread
+            {
+                Id = _store.Threads.Count + 1,
+                CustomerId = message.Thread.CustomerId,
+                Title = message.Thread.Title,
+                CreatedAtUtc = message.Thread.CreatedAtUtc,
+                LastActivityUtc = message.Thread.LastActivityUtc
+            };
+            _store.Threads.Add(thread);
+            threadId = thread.Id;
+        }
+        else if (threadId is not null)
+        {
+            var thread = _store.Threads.First(t => t.Id == threadId);
+            thread.LastActivityUtc = message.CreatedAtUtc;
+        }
+
         _store.Messages.Add(new CustomerGroupedMessage
         {
-            Id = _store.Messages.Count + 1,
+            Id = id,
             GroupId = message.GroupId,
             Message = message.Message,
+            OriginalText = message.OriginalText,
+            ThreadId = threadId,
             IsResolved = message.IsResolved,
             CreatedAtUtc = message.CreatedAtUtc
         });
+
+        if (message.Attachment is { } a)
+        {
+            _store.Attachments.Add(new MessageAttachment
+            {
+                Id = _store.Attachments.Count + 1,
+                GroupedMessageId = id,
+                Kind = a.Kind,
+                FileName = a.FileName,
+                MimeType = a.MimeType,
+                SizeBytes = a.SizeBytes,
+                BaleFileId = a.BaleFileId,
+                BaleFileUniqueId = a.BaleFileUniqueId,
+                Content = a.Content
+            });
+        }
+
         return Task.CompletedTask;
     }
 
@@ -219,4 +292,38 @@ public sealed class FakeGroupedMessageRepository : ICustomerGroupedMessageReposi
     public Task<IReadOnlyList<MessageCountRow>> GetCountsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<MessageTimeRow>> GetSinceAsync(DateTime sinceUtc, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> SetResolvedAsync(int customerId, int messageId, bool isResolved, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<bool> SetThreadResolvedAsync(int customerId, int threadId, bool isResolved, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<AttachmentContentDto?> GetAttachmentAsync(int attachmentId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}
+
+/// <summary>In-memory thread repository mirroring the rules of the EF implementation (open = unresolved message and recent activity).</summary>
+public sealed class FakeThreadRepository : ISupportThreadRepository
+{
+    private readonly FakeStore _store;
+
+    public FakeThreadRepository(FakeStore store) => _store = store;
+
+    public Task<IReadOnlyList<ThreadContextDto>> GetOpenContextAsync(int customerId, DateTime sinceUtc, int maxThreads, int messagesPerThread, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ThreadContextDto> result = _store.Threads
+            .Where(t => t.CustomerId == customerId && t.LastActivityUtc >= sinceUtc
+                        && _store.Messages.Any(m => m.ThreadId == t.Id && !m.IsResolved))
+            .OrderByDescending(t => t.LastActivityUtc)
+            .Take(maxThreads)
+            .Select(t => new ThreadContextDto(
+                t.Id,
+                t.Title,
+                t.LastActivityUtc,
+                _store.Messages
+                    .Where(m => m.ThreadId == t.Id && !string.IsNullOrWhiteSpace(m.OriginalText))
+                    .OrderByDescending(m => m.CreatedAtUtc).ThenByDescending(m => m.Id)
+                    .Take(messagesPerThread)
+                    .OrderBy(m => m.CreatedAtUtc).ThenBy(m => m.Id)
+                    .Select(m => new ThreadContextMessageDto(m.OriginalText!, _store.Groups.First(g => g.Id == m.GroupId).Priority, m.CreatedAtUtc))
+                    .ToList()))
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    public Task<IReadOnlyList<SupportThread>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }

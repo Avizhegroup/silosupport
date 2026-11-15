@@ -44,29 +44,56 @@ Updates arrive through **long polling** (`getUpdates`), the same mechanism `Silo
 2. If the sender is flagged `is_bot`, or equals the bot's own id (`getMe`, cached) → ignore.
 3. If the sender's Bale user name belongs to a **support person** (`SupportPersons.BaleUsername`, ignoring case and a
    leading `@`) → ignore: our own team's messages are never customer messages. **Every other sender is a customer.**
-4. If the message carries anything other than plain text (voice, audio, photo, document, video, sticker, ...) → ignore
-   (logged). Nothing is downloaded or transcribed.
-5. Empty / whitespace-only text → ignore.
+4. The text of the message is its `text` or, for a file, its `caption`. A message that has neither text nor a supported
+   file (photo, video, voice, audio, document, animation) – a sticker, contact or location, say – → ignore (logged).
+5. Empty / whitespace-only text without a file → ignore.
 6. Resolve the customer: (a) a registered `CustomerMember` whose Bale ID equals the sender's numeric id or user name
    wins, even when the message came from another customer's chat; (b) otherwise the customer whose
    `Customers.BaleChatId` is the chat the message came from, so senders without a user name, or nobody registered, are
    still processed; (c) otherwise ignore (logged with a hint to register the member or set the customer's chat id).
-7. Ask the AI API for the priority (see below). Failure / invalid / unsupported priority → log, stop. No fallback.
+7. Load the customer's **open issues** (see "Issue threads" below) and ask the AI API for the priority **and** whether the
+   message continues one of them (see below). Failure / invalid / unsupported priority → log, stop. No fallback.
+   A message that is only a file (no text) is never filed as Low: it is raised to Medium, because support cannot judge it.
 8. Resolve the destination group for **that customer and that priority**. Missing → log, stop.
-9. Format the text (customer, sender, priority, original message, AI analysis when returned).
-10. `sendMessage` to the destination group. Failure → log, **no record is written**.
-11. After a successful send, store a `CustomerGroupedMessage` with the exact sent text, the group's internal id,
-    `IsResolved = false` and a UTC timestamp. A database failure at this point is logged (the message is in Bale but
-    not in the history).
+9. Format the text (customer, sender, priority, issue title / "continues issue", attachment kind and file name, original
+   message, AI analysis when returned).
+10. Send to the destination group: a file is re-sent **by its `file_id`** (`sendPhoto`, `sendVideo`, `sendVoice`,
+    `sendAudio`, `sendAnimation` or `sendDocument`) with the formatted text as the caption. If Bale refuses the file the
+    text is sent as a normal message with a note that the file could not be sent. Failure → log, **no record is written**.
+11. After a successful send, download the file (`getFile`, up to `Bale:MaxDownloadMegabytes`, default 20 MB, the Bale
+    limit) and store a `CustomerGroupedMessage` with the exact sent text, the customer's original text, the thread, the
+    group's internal id, `IsResolved = false`, a UTC timestamp and a `MessageAttachment` (kind, name, MIME type, size,
+    Bale `file_id` and the bytes). A file that is too large or cannot be downloaded is still forwarded and recorded, just
+    without bytes. A database failure at this point is logged (the message is in Bale but not in the history).
+
+The Bale download URL contains the bot token and is never logged.
 
 The bot never replies to the source group and never sends error or info messages there.
+
+### Issue threads (follow-up messages)
+
+Customers often describe one problem over several messages, and often send unrelated messages one after another. Every
+recorded message therefore belongs to a `SupportThread` (one issue of one customer):
+
+- Before classifying, the service loads the customer's **open** threads: at least one unresolved message and activity
+  within `Threads:OpenWindowHours` (default 24), at most `Threads:MaxThreadsInContext` (5), each with its last
+  `Threads:MessagesPerThread` (4) customer texts and the priority they got.
+- These are put in the prompt, and the model answers `{"priority", "analysis", "threadId", "title"}`: `threadId` is the
+  number of the open issue the new message **clearly** continues, or `null` for a new, unrelated issue.
+- Only an id that was actually offered (same customer) is accepted; anything else starts a new issue (logged).
+- A follow-up is still routed by **its own** priority, but the model is told to judge the whole issue with its history
+  (a short "still not working" after a critical outage stays Critical). The forwarded text says "ادامه موضوع: <title>"
+  or "موضوع جدید: <title>".
+- Without an AI title the issue is titled with an excerpt of the first message. If the history cannot be loaded the
+  message is classified as a new issue.
+- Messages recorded before this feature have no thread and are shown as "old messages" in the panel.
 
 ### How the priority is obtained
 
 `Docs/RAG-Chat-Guide.md` documents only `POST /api/rag/chat/send`, which returns free text (`responseText`); it has no
 priority field and no classification endpoint. The adapter therefore sends a classification prompt through that same
 documented endpoint (via the existing `ISiloAiClient`, no conversation id, so customers are never mixed) asking for
-`{"priority":"Low|Medium|Critical","analysis":"..."}`. `AiPriorityResultParser` accepts **only** those three exact
+`{"priority":"Low|Medium|Critical","analysis":"...","threadId":<number|null>,"title":"..."}`. `AiPriorityResultParser` accepts **only** those three exact
 names (case-insensitive); anything else is rejected. `analysis` is the model's own text; if missing, the section is
 omitted. No local keyword rules exist.
 
@@ -79,7 +106,9 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 - `Customer.BaleChatId`: optional `long`, unique when set (filtered index). The Bale chat (usually a group) where a customer's people write; it must not be one of the priority groups.
 - `CustomerMember.PhoneNumber` is required (at least 10 digits; Persian digits accepted). `CustomerMember.BaleId` is **optional** (people without a Bale user name). When set it is **text** (`nvarchar(64)`, trimmed). Administrators enter the Bale **user name** (`@ali`) or the numeric Bale user id. An incoming message is matched on the numeric `from.id` **or** the `from.username`, ignoring case and a leading `@` (`@Ali`, `ali` and `ALI` are the same). A numeric id match wins over a user name match. If the match spans members of more than one customer, the message is ignored with a warning. Bale messages never carry the sender's phone number, so it cannot be used for matching; members without a Bale ID are covered by the customer's chat id (flow step 6b).
 - `CustomerGroup.BaleId`: `long` (chat ids can exceed 32 bits, up to 52 significant bits).
-- Unique: `SupportPersons.BaleUsername`; `Customers.BaleChatId` and `CustomerMembers.BaleId` (only non-NULL values); `CustomerGroups.BaleId`; `CustomerGroups(CustomerId, Priority)`.
+- `SupportThread` (`SupportThreads`): `CustomerId` (cascade), `Title`, `CreatedAtUtc`, `LastActivityUtc`. `CustomerGroupedMessages` gain `ThreadId` (nullable, `ON DELETE SET NULL`) and `OriginalText` (what the customer wrote; the forwarded `Message` also contains our header).
+- `MessageAttachment` (`MessageAttachments`): one per message (unique `GroupedMessageId`, cascade), `Kind` (text), `FileName`, `MimeType`, `SizeBytes`, `BaleFileId`, `BaleFileUniqueId`, `Content` (`varbinary(max)`, NULL when not downloaded). The list queries never load `Content`.
+- Unique: `SupportPersons.BaleUsername`; `Customers.BaleChatId` and `CustomerMembers.BaleId` (only non-NULL values); `CustomerGroups(CustomerId, Priority)`. `CustomerGroups.BaleId` is **not** unique any more (migration `Remove_Unique_BaleId`).
 - `CustomerGroups.Priority` is stored as text (`Low`/`Medium`/`Critical`).
 - `CustomerGroupedMessages.GroupId → CustomerGroups` is `Restrict`: groups and customers with history cannot be
   deleted (the services check first and show a message; the database enforces it). Members and groups without
@@ -97,7 +126,13 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 | `/admin/customers/{id}/members/new`, `/{memberId}/edit` | member form (customer shown explicitly) |
 | `/admin/customers/{id}/groups/new`, `/{groupId}/edit` | destination group form |
 | `/admin/support-persons`, `/new`, `/{id}/edit` | support team: list (Id, name, phone, Bale user name), create, edit, delete |
-| `/admin/conversations[/{customerId}]` | forwarded messages of one customer, per group, oldest first, resolve switch |
+| `/admin/conversations[/{customerId}]` | one customer's conversation in two tabs: **issues** (threads with their messages, priority, files, resolve a whole issue) and **groups** (per priority group, resolve a message) |
+| `/admin/attachments/{id}` | the stored file (endpoint, Administrator only) |
+
+**Files in the panel**: images, video and audio of allow-listed types play inline (`<img>`, `<video>`, `<audio>`); every other
+type – and every download button – is served as `application/octet-stream` with a sanitized file name. The endpoint
+sends `X-Content-Type-Options: nosniff` and a sandboxing CSP, requires the Administrator role, and never touches the Bale
+URL, so an uploaded HTML/SVG file cannot run in the panel's origin.
 
 The pages only use Application services. The conversations page loads one customer's messages with a database filter.
 Telerik components used: `TelerikRootComponent`, `TelerikAppBar`, `TelerikDrawer` (sidebar), `TelerikChart`,
@@ -146,7 +181,8 @@ installed on the build machine (see Telerik's licensing documentation), otherwis
 
 All settings are plain values in the `appsettings.json` of each host (no user secrets, no environment variables).
 
-**Windows service** (`SiloSupport.Service.CustomerSupport/appsettings.json`):
+**Windows service** (`SiloSupport.Service.CustomerSupport/appsettings.json`; `Bale:MaxDownloadMegabytes` (20) and the
+`Threads` section (`OpenWindowHours` 24, `MaxThreadsInContext` 5, `MessagesPerThread` 4) are optional):
 
 ```json
 {
@@ -202,6 +238,10 @@ Migrations (all written by hand together with the model snapshot):
    unique index is filtered to non-NULL values. `Down` gives such members a `member-<id>` placeholder.
 4. `20261115100000_SupportPersonsAndCustomerChat` – new `SupportPersons` table (unique `BaleUsername`) and the nullable
    `Customers.BaleChatId` with a filtered unique index.
+5. `20261103074459_Remove_Unique_BaleId` – generated by `dotnet ef` (with Designer): drops the unique index on `CustomerGroups.BaleId`.
+6. `20261116100000_MessageAttachmentsAndThreads` – `SupportThreads`, `CustomerGroupedMessages.ThreadId` / `OriginalText`,
+   `MessageAttachments`. Existing messages keep NULL thread and text. SQL Server adds the column and the foreign key;
+   the SQLite branch (tests) adds the column with an inline `REFERENCES`. `Down` is SQL Server only.
 
 They were written by hand because it was authored in an environment without the .NET SDK. Before relying on it, from the
 solution root run:
@@ -228,7 +268,15 @@ The Blazor Web project has no tests by decision.
 
 ## Known limitations
 
-- Only `message` updates are handled (not `edited_message`); media and captions are ignored by design.
+- Only `message` updates are handled (not `edited_message`). Stickers, contacts and locations are ignored. Voice
+  messages are stored and forwarded, **not transcribed**, so the AI judges them only by their caption (a voice-only
+  message is filed as Medium at least).
+- Files bigger than `Bale:MaxDownloadMegabytes` (Bale's download limit is 20 MB) are forwarded by `file_id` and recorded
+  without bytes; the panel says so. Files are stored in the database, so watch its size; set a smaller limit if needed.
+- An album (several photos sent together, `media_group_id`) arrives as separate messages; the AI usually links them
+  to one issue.
+- Thread assignment is the AI's decision, so it can be wrong; the history is shown in the panel and each message keeps
+  its own priority and group.
 - The worker starts at offset 0 and acknowledges a batch on the next poll, so after a restart Bale may re-deliver the
   last batch it had not yet seen acknowledged (and anything older than that, up to 24 h, if the bot was offline). A
   message already forwarded just before a restart could therefore be forwarded twice.

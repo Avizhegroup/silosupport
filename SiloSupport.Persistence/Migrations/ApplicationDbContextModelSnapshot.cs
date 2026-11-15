@@ -248,7 +248,16 @@ namespace SiloSupport.Persistence.Migrations
                         .HasMaxLength(4096)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("OriginalText")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int?>("ThreadId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ThreadId");
 
                     b.HasIndex("GroupId", "CreatedAtUtc");
 
@@ -296,6 +305,53 @@ namespace SiloSupport.Persistence.Migrations
                     b.ToTable("CustomerMembers", (string)null);
                 });
 
+            modelBuilder.Entity("SiloSupport.Domain.Entities.MessageAttachment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BaleFileId")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("BaleFileUniqueId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<byte[]>("Content")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<int>("GroupedMessageId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("MimeType")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupedMessageId")
+                        .IsUnique();
+
+                    b.ToTable("MessageAttachments", (string)null);
+                });
+
             modelBuilder.Entity("SiloSupport.Domain.Entities.SupportPerson", b =>
                 {
                     b.Property<int>("Id")
@@ -325,6 +381,35 @@ namespace SiloSupport.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("SupportPersons", (string)null);
+                });
+
+            modelBuilder.Entity("SiloSupport.Domain.Entities.SupportThread", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("LastActivityUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId", "LastActivityUtc");
+
+                    b.ToTable("SupportThreads", (string)null);
                 });
 
             modelBuilder.Entity("SiloSupport.Persistence.ApplicationUser", b =>
@@ -465,7 +550,14 @@ namespace SiloSupport.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SiloSupport.Domain.Entities.SupportThread", "Thread")
+                        .WithMany("Messages")
+                        .HasForeignKey("ThreadId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Group");
+
+                    b.Navigation("Thread");
                 });
 
             modelBuilder.Entity("SiloSupport.Domain.Entities.CustomerMember", b =>
@@ -479,6 +571,26 @@ namespace SiloSupport.Persistence.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("SiloSupport.Domain.Entities.MessageAttachment", b =>
+                {
+                    b.HasOne("SiloSupport.Domain.Entities.CustomerGroupedMessage", "GroupedMessage")
+                        .WithOne("Attachment")
+                        .HasForeignKey("SiloSupport.Domain.Entities.MessageAttachment", "GroupedMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GroupedMessage");
+                });
+
+            modelBuilder.Entity("SiloSupport.Domain.Entities.SupportThread", b =>
+                {
+                    b.HasOne("SiloSupport.Domain.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SiloSupport.Domain.Entities.Customer", b =>
                 {
                     b.Navigation("Groups");
@@ -487,6 +599,16 @@ namespace SiloSupport.Persistence.Migrations
                 });
 
             modelBuilder.Entity("SiloSupport.Domain.Entities.CustomerGroup", b =>
+                {
+                    b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("SiloSupport.Domain.Entities.CustomerGroupedMessage", b =>
+                {
+                    b.Navigation("Attachment");
+                });
+
+            modelBuilder.Entity("SiloSupport.Domain.Entities.SupportThread", b =>
                 {
                     b.Navigation("Messages");
                 });

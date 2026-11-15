@@ -15,8 +15,12 @@ public class CustomerGroupedMessageConfiguration : IEntityTypeConfiguration<Cust
         builder.Property(m => m.GroupId).IsRequired();
         builder.Property(m => m.IsResolved).IsRequired().HasDefaultValue(false);
         builder.Property(m => m.CreatedAtUtc).IsRequired();
+        builder.Property(m => m.OriginalText).HasMaxLength(4000);
 
         // Loading a group's history chronologically.
         builder.HasIndex(m => new { m.GroupId, m.CreatedAtUtc });
+
+        // Listing the messages of one issue.
+        builder.HasIndex(m => m.ThreadId);
     }
 }

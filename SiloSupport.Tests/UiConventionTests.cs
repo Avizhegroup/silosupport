@@ -36,7 +36,7 @@ public class UiConventionTests
         var layout = Read("Components", "Layout", "MainLayout.razor");
 
         Assert.Contains("dir=\"rtl\"", layout);
-        Assert.Contains("<TelerikRootComponent>", layout);
+        Assert.Contains("<TelerikRootComponent EnableRtl=\"true\">", layout);
     }
 
     [Theory]
@@ -128,6 +128,56 @@ public class UiConventionTests
             Assert.Contains("@attribute [AllowAnonymous]", text);
             Assert.Contains("@attribute [ExcludeFromInteractiveRouting]", text);
         }
+    }
+
+    [Fact]
+    public void ConversationsPage_ShowsIssueThreadsAndFiles_WithTelerikComponents()
+    {
+        var page = Read("Components", "Pages", "Admin", "Conversations", "CustomerConversations.razor");
+
+        Assert.Contains("[Authorize(Roles = AppRoles.Administrator)]", page);
+        Assert.Contains("<TelerikTabStrip>", page);
+        Assert.Contains("<TelerikSwitch", page);
+        Assert.Contains("<TelerikGrid", page);
+        Assert.Contains("<AttachmentView", page);
+        Assert.Contains("SetThreadResolvedAsync", page);
+        Assert.DoesNotContain("<input", page);
+    }
+
+    [Fact]
+    public void AttachmentView_UsesTheSecuredEndpointAndOnlyPlaysSafeTypes()
+    {
+        var view = Read("Components", "Shared", "AttachmentView.razor");
+
+        Assert.Contains("/admin/attachments/", view);
+        Assert.Contains("AttachmentMime.PreviewKind", view);
+        Assert.Contains("<video", view);
+        Assert.Contains("<audio", view);
+        Assert.DoesNotContain("<iframe", view);
+        Assert.DoesNotContain("<object", view);
+        Assert.DoesNotContain("<embed", view);
+    }
+
+    [Fact]
+    public void AttachmentEndpoint_IsAdministratorOnly_AndServesFilesSafely()
+    {
+        var program = Read("Program.cs");
+
+        Assert.Contains("MapGet(\"/admin/attachments/{id:int}\"", program);
+        Assert.Contains("RequireAuthorization(new AuthorizeAttribute { Roles = AppRoles.Administrator })", program);
+        Assert.Contains("AttachmentMime.IsInlineSafe", program);
+        Assert.Contains("nosniff", program);
+        Assert.Contains("application/octet-stream", program);
+    }
+
+    [Fact]
+    public void ThreadAndFileStyles_Exist()
+    {
+        var css = Read("wwwroot", "app.css");
+
+        Assert.Contains(".thread-timeline", css);
+        Assert.Contains(".attachment-image", css);
+        Assert.Contains(".attachment-video", css);
     }
 
     [Fact]

@@ -51,13 +51,16 @@ public class PersistenceTests : TestBase
     }
 
     [Fact]
-    public async Task Database_RejectsDuplicateGroupBaleId()
+    public async Task Database_AllowsTheSameBaleGroupForSeveralGroups_SinceTheUniqueIndexWasRemoved()
     {
+        // Migration 20261103074459_Remove_Unique_BaleId dropped the unique index on CustomerGroups.BaleId on purpose.
         var a = await AddCustomerAsync("A");
         var b = await AddCustomerAsync("B");
         await AddGroupAsync(a.Id, GroupPriority.Low, 100);
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => AddGroupAsync(b.Id, GroupPriority.Low, 100));
+        await AddGroupAsync(b.Id, GroupPriority.Low, 100);
+
+        Assert.Equal(2, await Db.CustomerGroups.CountAsync(g => g.BaleId == 100));
     }
 
     [Fact]
@@ -488,7 +491,7 @@ public class MigrationTests : IDisposable
             .SqlQueryRaw<string>("SELECT name AS Value FROM sqlite_master WHERE type = 'index' AND sql LIKE 'CREATE UNIQUE%'")
             .ToListAsync();
         Assert.Contains("IX_CustomerGroups_CustomerId_Priority", uniqueIndexes);
-        Assert.Contains("IX_CustomerGroups_BaleId", uniqueIndexes);
+        Assert.DoesNotContain("IX_CustomerGroups_BaleId", uniqueIndexes);
         Assert.Contains("IX_CustomerMembers_BaleId", uniqueIndexes);
     }
 

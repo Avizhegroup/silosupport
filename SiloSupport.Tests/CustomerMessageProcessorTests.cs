@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Services;
 using SiloSupport.Domain.Entities;
 using SiloSupport.Domain.Enums;
+using SiloSupport.Service.CustomerSupport.Options;
 using SiloSupport.Tests.Support;
 
 namespace SiloSupport.Tests;
@@ -37,9 +39,12 @@ public class CustomerMessageProcessorTests
             new FakeMemberRepository(_store),
             new FakeCustomerRepository(_store),
             new FakeSupportPersonRepository(_store),
+            new FakeThreadRepository(_store),
             new FakeGroupedMessageRepository(_store),
             _bale,
             _classifier,
+            Microsoft.Extensions.Options.Options.Create(new BaleBotOptions()),
+            Microsoft.Extensions.Options.Options.Create(new ThreadingOptions()),
             _clock,
             _logger);
     }
@@ -311,27 +316,19 @@ public class CustomerMessageProcessorTests
 
     // 5
     [Fact]
-    public async Task ProcessAsync_NonTextMessage_IsIgnoredAndLogged()
+    public async Task ProcessAsync_UnsupportedContentWithoutAFile_IsIgnoredAndLogged()
     {
-        // e.g. a voice message, photo or document: Bale gives no "text", only the media object.
-        var voice = new IncomingBaleMessage(1, SupportGroup, AcmeMember, false, null, true);
-        var photoWithCaptionOnly = new IncomingBaleMessage(2, SupportGroup, AcmeMember, false, null, true);
+        // e.g. a sticker, contact or location: Bale gives no text and no supported file.
+        var sticker = new IncomingBaleMessage(1, SupportGroup, AcmeMember, false, null, true);
+        var stickerWithText = new IncomingBaleMessage(2, SupportGroup, AcmeMember, false, "caption-like text", HasNonTextContent: true);
 
-        Assert.Equal(MessageProcessingOutcome.IgnoredUnsupportedMessage, await _processor.ProcessAsync(voice, CancellationToken.None));
-        Assert.Equal(MessageProcessingOutcome.IgnoredUnsupportedMessage, await _processor.ProcessAsync(photoWithCaptionOnly, CancellationToken.None));
+        Assert.Equal(MessageProcessingOutcome.IgnoredUnsupportedMessage, await _processor.ProcessAsync(sticker, CancellationToken.None));
+        Assert.Equal(MessageProcessingOutcome.IgnoredUnsupportedMessage, await _processor.ProcessAsync(stickerWithText, CancellationToken.None));
 
         Assert.Empty(_classifier.Calls);
         Assert.Empty(_bale.Sent);
-        Assert.True(_logger.Has(LogLevel.Information, "not an ordinary text message"));
-    }
-
-    [Fact]
-    public async Task ProcessAsync_MediaMessageThatAlsoCarriesText_IsIgnored()
-    {
-        var message = new IncomingBaleMessage(1, SupportGroup, AcmeMember, false, "caption-like text", HasNonTextContent: true);
-
-        Assert.Equal(MessageProcessingOutcome.IgnoredUnsupportedMessage, await _processor.ProcessAsync(message, CancellationToken.None));
-        Assert.Empty(_bale.Sent);
+        Assert.Empty(_bale.SentAttachments);
+        Assert.True(_logger.Has(LogLevel.Information, "neither text nor a supported file"));
     }
 
     // 6
@@ -497,5 +494,287 @@ public class CustomerMessageProcessorTests
         await _processor.ProcessAsync(Text(AcmeMember, "help", chat: SupportGroup), CancellationToken.None);
 
         Assert.DoesNotContain(_bale.Sent, s => s.ChatId == SupportGroup);
+    }
+
+    // ---- Files: photo, video, voice, audio, document, animation ----
+
+    private static IncomingBaleMessage File(AttachmentKind kind, string? caption = null, string fileId = "FILE-1", long? size = 1234, string? fileName = null, string? mime = null, long sender = AcmeMember) =>
+        new(1, SupportGroup, sender, false, caption, true,
+            Attachment: new IncomingAttachment(kind, fileId, "UNIQ-1", fileName, mime, size));
+
+    [Theory]
+    [InlineData(AttachmentKind.Photo)]
+    [InlineData(AttachmentKind.Video)]
+    [InlineData(AttachmentKind.Voice)]
+    [InlineData(AttachmentKind.Audio)]
+    [InlineData(AttachmentKind.Document)]
+    [InlineData(AttachmentKind.Animation)]
+    public async Task ProcessAsync_File_IsForwardedByFileIdWithTheTextAsCaption_AndStored(AttachmentKind kind)
+    {
+        ClassifyAs(GroupPriority.Critical);
+
+        var outcome = await _processor.ProcessAsync(File(kind, "the server is down"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        var sent = Assert.Single(_bale.SentAttachments);
+        Assert.Equal(2003, sent.ChatId); // Acme's Critical group, never the source chat
+        Assert.Equal(kind, sent.Kind);
+        Assert.Equal("FILE-1", sent.FileId);
+        Assert.Contains("the server is down", sent.Caption);
+        Assert.Contains("تحلیل هوش مصنوعی", sent.Caption);
+        Assert.Empty(_bale.Sent);
+
+        var message = Assert.Single(_store.Messages);
+        Assert.Equal(sent.Caption, message.Message);
+        Assert.Equal("the server is down", message.OriginalText);
+
+        var stored = Assert.Single(_store.Attachments);
+        Assert.Equal(message.Id, stored.GroupedMessageId);
+        Assert.Equal(kind, stored.Kind);
+        Assert.Equal("FILE-1", stored.BaleFileId);
+        Assert.Equal(new byte[] { 1, 2, 3 }, stored.Content);
+        Assert.False(string.IsNullOrEmpty(stored.MimeType));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_FileWithoutText_IsDescribedToTheAi_AndNeverFiledAsLow()
+    {
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await _processor.ProcessAsync(File(AttachmentKind.Voice), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Contains("voice message", _classifier.Calls.Single());
+        Assert.Equal(2002, _bale.SentAttachments.Single().ChatId); // raised to Medium
+        Assert.Null(_store.Messages.Single().OriginalText);
+        Assert.Single(_store.Attachments);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_FileWithoutText_KeepsAHigherPriorityTheAiChose()
+    {
+        ClassifyAs(GroupPriority.Critical);
+
+        await _processor.ProcessAsync(File(AttachmentKind.Photo), CancellationToken.None);
+
+        Assert.Equal(2003, _bale.SentAttachments.Single().ChatId);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_FileTooLargeToDownload_IsStillForwardedButStoredWithoutBytes()
+    {
+        ClassifyAs(GroupPriority.Medium);
+
+        var outcome = await _processor.ProcessAsync(File(AttachmentKind.Video, "big", size: 25L * 1024 * 1024), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Single(_bale.SentAttachments);
+        Assert.Empty(_bale.Downloads); // not even attempted
+        var stored = Assert.Single(_store.Attachments);
+        Assert.Null(stored.Content);
+        Assert.Equal(25L * 1024 * 1024, stored.SizeBytes);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_DownloadFailure_DoesNotLoseTheMessage()
+    {
+        ClassifyAs(GroupPriority.Medium);
+        _bale.Download = null;
+
+        var outcome = await _processor.ProcessAsync(File(AttachmentKind.Photo, "see"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Single(_bale.SentAttachments);
+        Assert.Null(Assert.Single(_store.Attachments).Content);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WhenBaleRefusesTheFile_TheTextIsStillSentWithANote()
+    {
+        ClassifyAs(GroupPriority.Medium);
+        _bale.SendAttachmentResult = false;
+
+        var outcome = await _processor.ProcessAsync(File(AttachmentKind.Document, "invoice", fileName: "a.pdf"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Empty(_bale.SentAttachments);
+        var text = Assert.Single(_bale.Sent);
+        Assert.Equal(2002, text.ChatId);
+        Assert.Contains("invoice", text.Text);
+        Assert.Contains("ارسال پیوست", text.Text);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WhenEverythingFailsToSend_NothingIsRecorded()
+    {
+        ClassifyAs(GroupPriority.Medium);
+        _bale.SendAttachmentResult = false;
+        _bale.SendResult = false;
+
+        var outcome = await _processor.ProcessAsync(File(AttachmentKind.Photo, "x"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.SendFailed, outcome);
+        Assert.Empty(_store.Messages);
+        Assert.Empty(_store.Attachments);
+        Assert.Empty(_store.Threads);
+        Assert.Empty(_bale.Downloads);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_FileFromAPriorityGroupOrSupportPerson_IsIgnored()
+    {
+        _store.SupportPersons.Add(new SupportPerson { Id = 1, BaleUsername = "agent", Name = "Agent" });
+        var fromSupport = new IncomingBaleMessage(1, SupportGroup, 42, false, null, true, SenderUsername: "agent",
+            Attachment: new IncomingAttachment(AttachmentKind.Photo, "F", null, null, null, 1));
+        var inGroup = File(AttachmentKind.Photo) with { ChatId = 2001 };
+
+        Assert.Equal(MessageProcessingOutcome.IgnoredSupportPerson, await _processor.ProcessAsync(fromSupport, CancellationToken.None));
+        Assert.Equal(MessageProcessingOutcome.IgnoredPriorityGroup, await _processor.ProcessAsync(inGroup, CancellationToken.None));
+        Assert.Empty(_bale.SentAttachments);
+        Assert.Empty(_bale.Downloads);
+    }
+
+    // ---- Issue threads ----
+
+    [Fact]
+    public async Task ProcessAsync_FirstMessage_StartsANewIssueWithTheAiTitle()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", threadId: null, threadTitle: "Login problem");
+
+        await _processor.ProcessAsync(Text(AcmeMember, "I cannot log in"), CancellationToken.None);
+
+        var thread = Assert.Single(_store.Threads);
+        Assert.Equal(1, thread.CustomerId);
+        Assert.Equal("Login problem", thread.Title);
+        Assert.Equal(thread.Id, _store.Messages.Single().ThreadId);
+        Assert.Empty(_classifier.ThreadContexts.Single());
+        Assert.Contains("موضوع جدید: Login problem", _bale.Sent.Single().Text);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithoutAnAiTitle_TheIssueIsTitledWithAnExcerptOfTheMessage()
+    {
+        ClassifyAs(GroupPriority.Low);
+
+        await _processor.ProcessAsync(Text(AcmeMember, "please   help\nme"), CancellationToken.None);
+
+        Assert.Equal("please help me", Assert.Single(_store.Threads).Title);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_FollowUp_IsAttachedToTheOpenIssueTheAiNames_AndTheAiSawTheHistory()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Login problem");
+        await _processor.ProcessAsync(Text(AcmeMember, "I cannot log in"), CancellationToken.None);
+        var threadId = _store.Threads.Single().Id;
+
+        _clock.Advance(TimeSpan.FromMinutes(3));
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Critical, "a", threadId, "ignored for follow ups");
+        await _processor.ProcessAsync(Text(AcmeMember, "it says wrong password even with the reset one"), CancellationToken.None);
+
+        Assert.Single(_store.Threads);
+        Assert.All(_store.Messages, m => Assert.Equal(threadId, m.ThreadId));
+        Assert.Equal(2, _store.Messages.Count);
+
+        // the AI saw the earlier message of the open issue
+        var context = Assert.Single(_classifier.ThreadContexts[1]);
+        Assert.Equal(threadId, context.ThreadId);
+        Assert.Equal("Login problem", context.Title);
+        Assert.Equal("I cannot log in", Assert.Single(context.Messages).Text);
+
+        // follow-up is routed by its own priority and labelled as a continuation
+        Assert.Equal(2003, _bale.Sent[1].ChatId);
+        Assert.Contains("ادامه موضوع: Login problem", _bale.Sent[1].Text);
+        Assert.Equal(_clock.GetUtcNow().UtcDateTime, _store.Threads.Single().LastActivityUtc);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UnrelatedMessage_StartsItsOwnIssue()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Login problem");
+        await _processor.ProcessAsync(Text(AcmeMember, "I cannot log in"), CancellationToken.None);
+
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Low, "a", null, "Invoice question");
+        await _processor.ProcessAsync(Text(AcmeMember, "when is my invoice due?"), CancellationToken.None);
+
+        Assert.Equal(2, _store.Threads.Count);
+        Assert.Equal(new[] { "Login problem", "Invoice question" }, _store.Threads.Select(t => t.Title));
+        Assert.NotEqual(_store.Messages[0].ThreadId, _store.Messages[1].ThreadId);
+        // both open issues were offered to the AI for the second decision
+        Assert.Single(_classifier.ThreadContexts[1]);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_AnIssueIdTheAiWasNeverOffered_IsNotTrusted()
+    {
+        // Beta has an open issue; the AI for Acme names it anyway.
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Beta thing");
+        await _processor.ProcessAsync(Text(BetaMember, "beta problem"), CancellationToken.None);
+        var betaThread = _store.Threads.Single().Id;
+
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Low, "a", betaThread, "Acme thing");
+        await _processor.ProcessAsync(Text(AcmeMember, "acme question"), CancellationToken.None);
+
+        Assert.Equal(2, _store.Threads.Count);
+        var acme = _store.Threads.Single(t => t.CustomerId == 1);
+        Assert.Equal("Acme thing", acme.Title);
+        Assert.Equal(acme.Id, _store.Messages[1].ThreadId);
+        Assert.Contains(_logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("was not offered"));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ResolvedOrStaleIssues_AreNotOfferedToTheAi()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Old");
+        await _processor.ProcessAsync(Text(AcmeMember, "first"), CancellationToken.None);
+        _store.Messages.Single().IsResolved = true;
+
+        await _processor.ProcessAsync(Text(AcmeMember, "second"), CancellationToken.None);
+        Assert.Empty(_classifier.ThreadContexts[1]); // resolved
+
+        _clock.Advance(TimeSpan.FromHours(30));
+        await _processor.ProcessAsync(Text(AcmeMember, "third"), CancellationToken.None);
+        Assert.Empty(_classifier.ThreadContexts[2]); // the open one ("second") is older than the 24 hour window
+    }
+
+    [Fact]
+    public async Task ProcessAsync_AFileCanContinueAnIssue()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Broken screen");
+        await _processor.ProcessAsync(Text(AcmeMember, "the screen looks broken"), CancellationToken.None);
+        var threadId = _store.Threads.Single().Id;
+
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", threadId, null);
+        await _processor.ProcessAsync(File(AttachmentKind.Photo), CancellationToken.None);
+
+        Assert.Single(_store.Threads);
+        Assert.Equal(threadId, _store.Messages[1].ThreadId);
+        Assert.Contains("ادامه موضوع: Broken screen", _bale.SentAttachments.Single().Caption);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WhenTheOpenIssuesCannotBeLoaded_TheMessageIsStillClassifiedAsANewIssue()
+    {
+        var failing = new CustomerMessageProcessor(
+            new FakeGroupRepository(_store), new FakeMemberRepository(_store), new FakeCustomerRepository(_store),
+            new FakeSupportPersonRepository(_store), new ThrowingThreadRepository(), new FakeGroupedMessageRepository(_store),
+            _bale, _classifier,
+            Microsoft.Extensions.Options.Options.Create(new BaleBotOptions()),
+            Microsoft.Extensions.Options.Options.Create(new ThreadingOptions()), _clock, _logger);
+        ClassifyAs(GroupPriority.Low);
+
+        var outcome = await failing.ProcessAsync(Text(AcmeMember, "hello"), CancellationToken.None);
+
+        Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
+        Assert.Single(_store.Threads);
+        Assert.Contains(_logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("without history"));
+    }
+
+    private sealed class ThrowingThreadRepository : SiloSupport.Application.Interfaces.ISupportThreadRepository
+    {
+        public Task<IReadOnlyList<ThreadContextDto>> GetOpenContextAsync(int customerId, DateTime sinceUtc, int maxThreads, int messagesPerThread, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("db down");
+
+        public Task<IReadOnlyList<SupportThread>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

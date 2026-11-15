@@ -1,5 +1,6 @@
 using System.Text;
 using SiloSupport.Application.Dtos;
+using SiloSupport.Domain.Enums;
 
 namespace SiloSupport.Service.CustomerSupport.Helpers;
 
@@ -27,9 +28,28 @@ public static class ForwardedMessageFormatter
         builder.AppendLine($"فرستنده: {sender}");
 
         builder.AppendLine($"اولویت: {context.Priority}");
-        builder.AppendLine();
-        builder.AppendLine("متن پیام:");
-        builder.AppendLine(Truncate(context.OriginalMessage.Trim(), MaxMessageCharacters));
+
+        if (!string.IsNullOrWhiteSpace(context.ThreadTitle))
+        {
+            builder.AppendLine(context.IsFollowUp
+                ? $"🧵 ادامه موضوع: {Truncate(context.ThreadTitle.Trim(), MaxNameCharacters)}"
+                : $"🧵 موضوع جدید: {Truncate(context.ThreadTitle.Trim(), MaxNameCharacters)}");
+        }
+
+        if (context.AttachmentKind is { } kind)
+        {
+            var file = $"پیوست: {Label(kind)}";
+            if (!string.IsNullOrWhiteSpace(context.AttachmentFileName))
+                file += $" ({Truncate(context.AttachmentFileName.Trim(), MaxNameCharacters)})";
+            builder.AppendLine(file);
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.OriginalMessage))
+        {
+            builder.AppendLine();
+            builder.AppendLine("متن پیام:");
+            builder.AppendLine(Truncate(context.OriginalMessage.Trim(), MaxMessageCharacters));
+        }
 
         if (!string.IsNullOrWhiteSpace(context.Analysis))
         {
@@ -40,6 +60,17 @@ public static class ForwardedMessageFormatter
 
         return builder.ToString().TrimEnd();
     }
+
+    /// <summary>The Persian name of a file kind, as shown to support.</summary>
+    public static string Label(AttachmentKind kind) => kind switch
+    {
+        AttachmentKind.Photo => "تصویر",
+        AttachmentKind.Video => "ویدیو",
+        AttachmentKind.Voice => "پیام صوتی",
+        AttachmentKind.Audio => "فایل صوتی",
+        AttachmentKind.Animation => "انیمیشن",
+        _ => "فایل"
+    };
 
     private static string Truncate(string value, int max)
     {

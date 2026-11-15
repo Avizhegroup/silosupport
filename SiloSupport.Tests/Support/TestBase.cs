@@ -37,6 +37,7 @@ public abstract class TestBase : IDisposable
         services.AddScoped<ICustomerMemberRepository, CustomerMemberRepository>();
         services.AddScoped<ICustomerGroupRepository, CustomerGroupRepository>();
         services.AddScoped<ICustomerGroupedMessageRepository, CustomerGroupedMessageRepository>();
+        services.AddScoped<ISupportThreadRepository, SupportThreadRepository>();
         services.AddScoped<CustomerService>();
         services.AddScoped<CustomerMemberService>();
         services.AddScoped<SupportPersonService>();

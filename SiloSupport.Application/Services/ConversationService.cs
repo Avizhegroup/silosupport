@@ -10,15 +10,18 @@ public class ConversationService
     private readonly ICustomerRepository _customers;
     private readonly ICustomerGroupRepository _groups;
     private readonly ICustomerGroupedMessageRepository _messages;
+    private readonly ISupportThreadRepository _threads;
 
     public ConversationService(
         ICustomerRepository customers,
         ICustomerGroupRepository groups,
-        ICustomerGroupedMessageRepository messages)
+        ICustomerGroupedMessageRepository messages,
+        ISupportThreadRepository threads)
     {
         _customers = customers;
         _groups = groups;
         _messages = messages;
+        _threads = threads;
     }
 
     /// <summary>
@@ -47,11 +50,60 @@ public class ConversationService
                 byGroup.TryGetValue(g.Id, out var list) ? list : Array.Empty<GroupedMessageDto>()))
             .ToList();
 
+        // The same messages again, but grouped by issue (thread) instead of by destination group.
+        var groupsById = groups.ToDictionary(g => g.Id);
+        ThreadMessageDto ToThreadMessage(GroupedMessageDto m) => new(
+            m.Id,
+            m.GroupId,
+            groupsById.TryGetValue(m.GroupId, out var g) ? g.Name : string.Empty,
+            groupsById.TryGetValue(m.GroupId, out var gp) ? gp.Priority : default,
+            m.Message,
+            m.CreatedAtUtc,
+            m.IsResolved,
+            m.Attachment);
+
+        var threadRows = await _threads.GetByCustomerAsync(customerId, cancellationToken);
+        var threadDtos = threadRows
+            .Select(t => new ThreadDto(
+                t.Id,
+                t.Title,
+                DateTime.SpecifyKind(t.CreatedAtUtc, DateTimeKind.Utc),
+                DateTime.SpecifyKind(t.LastActivityUtc, DateTimeKind.Utc),
+                messages.Where(m => m.ThreadId == t.Id)
+                    .OrderBy(m => m.CreatedAtUtc).ThenBy(m => m.Id)
+                    .Select(ToThreadMessage)
+                    .ToList()))
+            .OrderByDescending(t => t.LastActivityUtc)
+            .ThenByDescending(t => t.Id)
+            .ToList();
+
+        var legacy = messages
+            .Where(m => m.ThreadId is null)
+            .OrderBy(m => m.CreatedAtUtc).ThenBy(m => m.Id)
+            .Select(ToThreadMessage)
+            .ToList();
+
         return new CustomerConversationDto(
             customer.Id,
             customer.Name,
             groupDtos,
-            PriorityHelper.Missing(groups.Select(g => g.Priority)));
+            PriorityHelper.Missing(groups.Select(g => g.Priority)),
+            threadDtos,
+            legacy);
+    }
+
+    /// <summary>Resolves or re-opens every message of one issue of the given customer.</summary>
+    public async Task<OperationResult> SetThreadResolvedAsync(int customerId, int threadId, bool isResolved, CancellationToken cancellationToken = default)
+    {
+        var updated = await _messages.SetThreadResolvedAsync(customerId, threadId, isResolved, cancellationToken);
+        return updated ? OperationResult.Success() : OperationResult.Failure("موضوع برای این مشتری یافت نشد.");
+    }
+
+    /// <summary>The stored file of a message, or null when it does not exist or could not be downloaded.</summary>
+    public async Task<AttachmentContentDto?> GetAttachmentAsync(int attachmentId, CancellationToken cancellationToken = default)
+    {
+        var attachment = await _messages.GetAttachmentAsync(attachmentId, cancellationToken);
+        return attachment is { Content: not null } ? attachment : null;
     }
 
     /// <summary>Marks a message of the given customer as resolved or unresolved and persists it.</summary>

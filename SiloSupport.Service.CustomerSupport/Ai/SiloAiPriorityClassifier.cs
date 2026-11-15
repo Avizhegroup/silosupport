@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using SiloSupport.Application;
 using SiloSupport.Application.Dtos;
 using SiloSupport.Application.Helpers;
@@ -22,14 +22,17 @@ public class SiloAiPriorityClassifier : IMessagePriorityClassifier
         _logger = logger;
     }
 
-    public async Task<PriorityClassificationResult> ClassifyAsync(string customerMessage, CancellationToken cancellationToken)
+    public async Task<PriorityClassificationResult> ClassifyAsync(
+        string customerMessage,
+        IReadOnlyList<ThreadContextDto> openThreads,
+        CancellationToken cancellationToken)
     {
         RagChatResponse? response;
         try
         {
             response = await _ai.SendAsync(
                 conversationId: null,
-                PriorityClassificationPrompt.Build(customerMessage),
+                PriorityClassificationPrompt.Build(customerMessage, openThreads),
                 RagDocType.Support,
                 cancellationToken);
         }
@@ -56,6 +59,6 @@ public class SiloAiPriorityClassifier : IMessagePriorityClassifier
         if (!AiPriorityResultParser.TryParse(response.ResponseText, out var parsed, out var error))
             return PriorityClassificationResult.Failure(error ?? "The AI response could not be parsed.");
 
-        return PriorityClassificationResult.Success(parsed!.Priority, parsed.Analysis);
+        return PriorityClassificationResult.Success(parsed!.Priority, parsed.Analysis, parsed.ThreadId, parsed.ThreadTitle);
     }
 }

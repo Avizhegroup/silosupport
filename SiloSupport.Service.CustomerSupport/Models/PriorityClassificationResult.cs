@@ -5,12 +5,14 @@ namespace SiloSupport.Service.CustomerSupport.Models;
 /// <summary>Result of asking the AI API for a priority.</summary>
 public sealed class PriorityClassificationResult
 {
-    private PriorityClassificationResult(bool succeeded, GroupPriority priority, string? analysis, string? error)
+    private PriorityClassificationResult(bool succeeded, GroupPriority priority, string? analysis, string? error, int? threadId, string? threadTitle)
     {
         Succeeded = succeeded;
         Priority = priority;
         Analysis = analysis;
         Error = error;
+        ThreadId = threadId;
+        ThreadTitle = threadTitle;
     }
 
     public bool Succeeded { get; }
@@ -22,11 +24,20 @@ public sealed class PriorityClassificationResult
 
     public string? Error { get; }
 
-    public static PriorityClassificationResult Success(GroupPriority priority, string? analysis) =>
-        new(true, priority, analysis, null);
+    /// <summary>
+    /// The open issue the AI says the message continues. Null when the message starts a new issue. The processor only
+    /// accepts an id that was offered to the AI.
+    /// </summary>
+    public int? ThreadId { get; }
+
+    /// <summary>A short title of the issue the message belongs to (used as the title of a new issue); null when the AI gave none.</summary>
+    public string? ThreadTitle { get; }
+
+    public static PriorityClassificationResult Success(GroupPriority priority, string? analysis, int? threadId = null, string? threadTitle = null) =>
+        new(true, priority, analysis, null, threadId, threadTitle);
 
     public static PriorityClassificationResult Failure(string error) =>
-        new(false, default, null, error);
+        new(false, default, null, error, null, null);
 }
 
 /// <summary>Everything needed to build the text forwarded to a priority group.</summary>
@@ -36,7 +47,11 @@ public sealed record ForwardedMessageContext(
     string MemberPhoneNumber,
     GroupPriority Priority,
     string OriginalMessage,
-    string? Analysis);
+    string? Analysis,
+    string? ThreadTitle = null,
+    bool IsFollowUp = false,
+    AttachmentKind? AttachmentKind = null,
+    string? AttachmentFileName = null);
 
 /// <summary>Result of processing one incoming Bale message (useful for tests and diagnostics).</summary>
 public enum MessageProcessingOutcome

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using SiloSupport.Application.Helpers;
 using SiloSupport.Application.Services;
+using SiloSupport.Domain.Enums;
 using SiloSupport.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using SiloSupport.Web.Components;
@@ -108,6 +110,28 @@ app.MapGet("/Account/LogoutPost", async (HttpContext http, SignInManager<Applica
     http.Response.Headers.CacheControl = "no-store";
     return Results.Redirect("/Account/Login");
 }).AllowAnonymous();
+
+// 8. Files customers sent (photo, video, voice, ...). Administrators only (application level: the fallback policy; role
+//    level: the Administrator role). Only allow-listed image/video/audio types are rendered inline; every other type is
+//    a download, and "nosniff" stops the browser from guessing a more dangerous type, so a customer can never run a
+//    page or script in the panel's origin. The Bale download URL (it contains the bot token) is never involved here.
+app.MapGet("/admin/attachments/{id:int}", async (int id, bool? download, HttpContext http, ConversationService conversations, CancellationToken cancellationToken) =>
+{
+    var file = await conversations.GetAttachmentAsync(id, cancellationToken);
+    if (file?.Content is null)
+        return Results.NotFound();
+
+    var mime = AttachmentMime.Resolve(file.Kind, file.MimeType);
+    var inline = download != true && AttachmentMime.IsInlineSafe(mime);
+
+    http.Response.Headers.XContentTypeOptions = "nosniff";
+    http.Response.Headers.ContentSecurityPolicy = "default-src 'none'; sandbox";
+    http.Response.Headers.CacheControl = "private, max-age=3600";
+
+    return inline
+        ? Results.Bytes(file.Content, mime, enableRangeProcessing: true)
+        : Results.Bytes(file.Content, "application/octet-stream", AttachmentMime.DownloadName(file.Id, file.FileName, mime));
+}).RequireAuthorization(new AuthorizeAttribute { Roles = AppRoles.Administrator });
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

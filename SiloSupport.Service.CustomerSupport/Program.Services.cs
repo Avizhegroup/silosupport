@@ -18,6 +18,7 @@ public static partial class Program
         // Typed options (same section names as the existing SiloSupport.Service.CustomerChat project).
         services.AddOptions<BaleBotOptions>().Bind(configuration.GetSection(BaleBotOptions.SectionName));
         services.AddOptions<RagAiOptions>().Bind(configuration.GetSection(RagAiOptions.SectionName));
+        services.AddOptions<ThreadingOptions>().Bind(configuration.GetSection(ThreadingOptions.SectionName));
 
         // Persistence (the Web project owns and applies the migrations; this service never migrates).
         services.AddSupportPersistence(configuration["Database:ConnectionString"]);

@@ -1,0 +1,63 @@
+@* A file the customer sent: an image / video / audio player for safe types, otherwise a download link. The bytes come
+   from the Administrator-only /admin/attachments/{id} endpoint. *@
+@if (Attachment is not null)
+{
+    <div class="attachment">
+        <div class="attachment-head">
+            <span class="attachment-kind">@KindLabel</span>
+            @if (!string.IsNullOrWhiteSpace(Attachment.FileName))
+            {
+                <span class="attachment-name" dir="ltr">@Attachment.FileName</span>
+            }
+            @if (!string.IsNullOrEmpty(Size))
+            {
+                <span class="muted" dir="ltr">@Size</span>
+            }
+        </div>
+
+        @if (!Attachment.HasContent)
+        {
+            <div class="muted">این فایل در پنل ذخیره نشده است (برای مثال حجم آن بیش از ۲۰ مگابایت بوده)؛ در گروه پشتیبانی ارسال شده است.</div>
+        }
+        else
+        {
+            var url = $"/admin/attachments/{Attachment.Id}";
+            switch (AttachmentMime.PreviewKind(Attachment.MimeType))
+            {
+                case "image":
+                    <a href="@url" target="_blank" rel="noopener" data-enhance-nav="false">
+                        <img class="attachment-image" src="@url" alt="@KindLabel" loading="lazy" />
+                    </a>
+                    break;
+                case "video":
+                    <video class="attachment-video" controls preload="metadata" src="@url"></video>
+                    break;
+                case "audio":
+                    <audio class="attachment-audio" controls preload="none" src="@url"></audio>
+                    break;
+            }
+
+            <div class="attachment-actions">
+                <a class="k-button k-button-md k-button-outline k-button-outline-base k-rounded-md" href="@(url)?download=true" data-enhance-nav="false">
+                    <span class="k-button-text">دانلود فایل</span>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public AttachmentInfoDto? Attachment { get; set; }
+
+    private string Size => AttachmentMime.FormatSize(Attachment?.SizeBytes);
+
+    private string KindLabel => Attachment?.Kind switch
+    {
+        AttachmentKind.Photo => "تصویر",
+        AttachmentKind.Video => "ویدیو",
+        AttachmentKind.Voice => "پیام صوتی",
+        AttachmentKind.Audio => "فایل صوتی",
+        AttachmentKind.Animation => "انیمیشن",
+        _ => "فایل"
+    };
+}

@@ -48,46 +48,116 @@ else
         <div class="banner banner-info">این مشتری هنوز گروه اولویتی ندارد.</div>
     }
 
-    @foreach (var group in _conversation.Groups)
-    {
-        <div class="panel">
-            <div class="panel-head">
-                <h2>@group.GroupName <PriorityChip Priority="group.Priority" /></h2>
-                <span class="muted">@group.Messages.Count پیام</span>
-            </div>
+    <TelerikTabStrip>
+        <TabStripTab Title="موضوعات (پیگیری مکالمه‌ها)">
+            @if (_conversation.Threads.Count == 0 && _conversation.LegacyMessages.Count == 0)
+            {
+                <p class="muted">هنوز موضوعی ثبت نشده است.</p>
+            }
 
-            @if (group.Messages.Count == 0)
+            @foreach (var thread in _conversation.Threads)
             {
-                <p class="muted">هنوز پیامی به این گروه ارسال نشده است.</p>
-            }
-            else
-            {
-                <TelerikGrid Data="group.Messages" TItem="GroupedMessageDto" Height="@(group.Messages.Count > 6 ? "480px" : null)">
-                    <GridColumns>
-                        <GridColumn Title="زمان" Width="170px">
-                            <Template>
-                                @{ var m = (GroupedMessageDto)context; }
-                                @PersianDateFormatter.FormatUtc(m.CreatedAtUtc)
-                            </Template>
-                        </GridColumn>
-                        <GridColumn Title="پیام">
-                            <Template>
-                                @{ var m = (GroupedMessageDto)context; }
+                <div class="panel thread @(thread.IsOpen ? "thread-open" : "thread-closed")">
+                    <div class="panel-head">
+                        <div>
+                            <h2>@thread.Title <PriorityChip Priority="thread.HighestPriority" /></h2>
+                            <span class="muted">
+                                @thread.Messages.Count پیام · شروع: @PersianDateFormatter.FormatUtc(thread.CreatedAtUtc) · آخرین فعالیت: @PersianDateFormatter.FormatUtc(thread.LastActivityUtc)
+                            </span>
+                        </div>
+                        <TelerikSwitch Value="!thread.IsOpen" ValueChanged="@((bool value) => SetThreadResolvedAsync(thread, value))"
+                                       OnLabel="حل‌شده" OffLabel="در حال رسیدگی" Width="170px" />
+                    </div>
+
+                    <ol class="thread-timeline">
+                        @foreach (var m in thread.Messages)
+                        {
+                            <li class="thread-message">
+                                <div class="thread-message-meta">
+                                    <span>@PersianDateFormatter.FormatUtc(m.CreatedAtUtc)</span>
+                                    <PriorityChip Priority="m.Priority" />
+                                    <span class="muted">@m.GroupName</span>
+                                    @if (m.IsResolved)
+                                    {
+                                        <span class="muted">· حل‌شده</span>
+                                    }
+                                </div>
                                 <div class="message-text">@m.Message</div>
-                            </Template>
-                        </GridColumn>
-                        <GridColumn Title="وضعیت" Width="190px">
-                            <Template>
-                                @{ var m = (GroupedMessageDto)context; }
-                                <TelerikSwitch Value="m.IsResolved" ValueChanged="@((bool value) => SetResolvedAsync(m, value))"
-                                               OnLabel="حل‌شده" OffLabel="حل‌نشده" Width="150px" />
-                            </Template>
-                        </GridColumn>
-                    </GridColumns>
-                </TelerikGrid>
+                                <AttachmentView Attachment="m.Attachment" />
+                            </li>
+                        }
+                    </ol>
+                </div>
             }
-        </div>
-    }
+
+            @if (_conversation.LegacyMessages.Count > 0)
+            {
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>پیام‌های قدیمی (بدون موضوع)</h2>
+                        <span class="muted">@_conversation.LegacyMessages.Count پیام</span>
+                    </div>
+                    <ol class="thread-timeline">
+                        @foreach (var m in _conversation.LegacyMessages)
+                        {
+                            <li class="thread-message">
+                                <div class="thread-message-meta">
+                                    <span>@PersianDateFormatter.FormatUtc(m.CreatedAtUtc)</span>
+                                    <PriorityChip Priority="m.Priority" />
+                                    <span class="muted">@m.GroupName</span>
+                                </div>
+                                <div class="message-text">@m.Message</div>
+                            </li>
+                        }
+                    </ol>
+                </div>
+            }
+        </TabStripTab>
+
+        <TabStripTab Title="گروه‌های اولویت">
+            @foreach (var group in _conversation.Groups)
+            {
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>@group.GroupName <PriorityChip Priority="group.Priority" /></h2>
+                        <span class="muted">@group.Messages.Count پیام</span>
+                    </div>
+
+                    @if (group.Messages.Count == 0)
+                    {
+                        <p class="muted">هنوز پیامی به این گروه ارسال نشده است.</p>
+                    }
+                    else
+                    {
+                        <TelerikGrid Data="group.Messages" TItem="GroupedMessageDto" Height="@(group.Messages.Count > 6 ? "480px" : null)">
+                            <GridColumns>
+                                <GridColumn Title="زمان" Width="170px">
+                                    <Template>
+                                        @{ var m = (GroupedMessageDto)context; }
+                                        @PersianDateFormatter.FormatUtc(m.CreatedAtUtc)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Title="پیام">
+                                    <Template>
+                                        @{ var m = (GroupedMessageDto)context; }
+                                        <div class="message-text">@m.Message</div>
+                                        <AttachmentView Attachment="m.Attachment" />
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Title="وضعیت" Width="190px">
+                                    <Template>
+                                        @{ var m = (GroupedMessageDto)context; }
+                                        <TelerikSwitch Value="m.IsResolved" ValueChanged="@((bool value) => SetResolvedAsync(m, value))"
+                                                       OnLabel="حل‌شده" OffLabel="حل‌نشده" Width="150px" />
+                                    </Template>
+                                </GridColumn>
+                            </GridColumns>
+                        </TelerikGrid>
+                    }
+                </div>
+            }
+        </TabStripTab>
+    </TelerikTabStrip>
 }
 
 @code {
@@ -124,6 +194,13 @@ else
     private void OnCustomerChanged(int customerId)
     {
         Navigation.NavigateTo(customerId == 0 ? "/admin/conversations" : $"/admin/conversations/{customerId}");
+    }
+
+    private async Task SetThreadResolvedAsync(ThreadDto thread, bool isResolved)
+    {
+        var result = await Conversations.SetThreadResolvedAsync(CustomerId!.Value, thread.Id, isResolved);
+        _error = result.Succeeded ? null : result.FirstError ?? "ذخیره وضعیت انجام نشد.";
+        _conversation = await Conversations.GetAsync(CustomerId.Value);
     }
 
     private async Task SetResolvedAsync(GroupedMessageDto message, bool isResolved)

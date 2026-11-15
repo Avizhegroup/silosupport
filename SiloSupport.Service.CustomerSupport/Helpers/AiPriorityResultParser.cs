@@ -4,8 +4,10 @@ using SiloSupport.Domain.Enums;
 
 namespace SiloSupport.Service.CustomerSupport.Helpers;
 
-/// <summary>The priority and analysis extracted from the AI response.</summary>
-public sealed record AiClassification(GroupPriority Priority, string? Analysis);
+/// <summary>The priority, analysis, continued issue and issue title extracted from the AI response.</summary>
+/// <param name="ThreadId">The open issue the message continues; null for a new issue (or when the AI gave no usable id).</param>
+/// <param name="ThreadTitle">Short title of the issue; null when the AI gave none.</param>
+public sealed record AiClassification(GroupPriority Priority, string? Analysis, int? ThreadId = null, string? ThreadTitle = null);
 
 /// <summary>
 /// Parses the AI answer to the classification prompt: a JSON object with a "priority" of exactly
@@ -47,6 +49,8 @@ public static class AiPriorityResultParser
 
             string? priorityText = null;
             string? analysis = null;
+            int? threadId = null;
+            string? title = null;
             var hasPriority = false;
 
             foreach (var property in document.RootElement.EnumerateObject())
@@ -61,6 +65,20 @@ public static class AiPriorityResultParser
                          && property.Value.ValueKind == JsonValueKind.String)
                 {
                     analysis = property.Value.GetString();
+                }
+                else if (string.Equals(property.Name, "threadId", StringComparison.OrdinalIgnoreCase))
+                {
+                    // A number (or a numeric string) is an issue number; null, "new" or anything else means a new issue.
+                    if (property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetInt32(out var number))
+                        threadId = number;
+                    else if (property.Value.ValueKind == JsonValueKind.String
+                             && int.TryParse(property.Value.GetString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsedNumber))
+                        threadId = parsedNumber;
+                }
+                else if (string.Equals(property.Name, "title", StringComparison.OrdinalIgnoreCase)
+                         && property.Value.ValueKind == JsonValueKind.String)
+                {
+                    title = property.Value.GetString();
                 }
             }
 
@@ -77,7 +95,8 @@ public static class AiPriorityResultParser
             }
 
             analysis = string.IsNullOrWhiteSpace(analysis) ? null : analysis.Trim();
-            result = new AiClassification(priority, analysis);
+            title = string.IsNullOrWhiteSpace(title) ? null : title.Trim();
+            result = new AiClassification(priority, analysis, threadId, title);
             return true;
         }
         catch (JsonException)
