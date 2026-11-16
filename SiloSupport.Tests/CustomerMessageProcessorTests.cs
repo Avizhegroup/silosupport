@@ -537,15 +537,16 @@ public class CustomerMessageProcessorTests
     }
 
     [Fact]
-    public async Task ProcessAsync_FileWithoutText_IsDescribedToTheAi_AndNeverFiledAsLow()
+    public async Task ProcessAsync_FileWithoutText_IsDescribedToTheAi_AndKeepsThePriorityTheAiChose()
     {
+        // support-instructions.md section 9: a message that is only a file is Low ("no readable problem description").
         ClassifyAs(GroupPriority.Low);
 
         var outcome = await _processor.ProcessAsync(File(AttachmentKind.Voice), CancellationToken.None);
 
         Assert.Equal(MessageProcessingOutcome.Forwarded, outcome);
         Assert.Contains("voice message", _classifier.Calls.Single());
-        Assert.Equal(2002, _bale.SentAttachments.Single().ChatId); // raised to Medium
+        Assert.Equal(2001, _bale.SentAttachments.Single().ChatId); // Low group: no silent raise
         Assert.Null(_store.Messages.Single().OriginalText);
         Assert.Single(_store.Attachments);
     }
@@ -723,18 +724,112 @@ public class CustomerMessageProcessorTests
     }
 
     [Fact]
-    public async Task ProcessAsync_ResolvedOrStaleIssues_AreNotOfferedToTheAi()
+    public async Task ProcessAsync_ResolvedIssues_AreNotOffered_ButOpenOnesAreOfferedHoweverOldTheyAre()
     {
-        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Old");
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Old", "old summary");
         await _processor.ProcessAsync(Text(AcmeMember, "first"), CancellationToken.None);
         _store.Messages.Single().IsResolved = true;
 
         await _processor.ProcessAsync(Text(AcmeMember, "second"), CancellationToken.None);
-        Assert.Empty(_classifier.ThreadContexts[1]); // resolved
+        Assert.Empty(_classifier.ThreadContexts[1]); // the resolved issue is not offered
 
-        _clock.Advance(TimeSpan.FromHours(30));
+        // Two weeks later the unresolved issue ("second") is still offered: there is no age limit.
+        _clock.Advance(TimeSpan.FromDays(14));
         await _processor.ProcessAsync(Text(AcmeMember, "third"), CancellationToken.None);
-        Assert.Empty(_classifier.ThreadContexts[2]); // the open one ("second") is older than the 24 hour window
+        Assert.Single(_classifier.ThreadContexts[2]);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_AnOldOpenIssue_IsRejoinedWeeksLater()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Printer offset", "Labels print off-center.");
+        await _processor.ProcessAsync(Text(AcmeMember, "labels print off center"), CancellationToken.None);
+        var threadId = _store.Threads.Single().Id;
+
+        _clock.Advance(TimeSpan.FromDays(40));
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", threadId, null, "Labels print off-center again after the driver update.");
+        await _processor.ProcessAsync(Text(AcmeMember, "the printer problem is back"), CancellationToken.None);
+
+        Assert.Single(_store.Threads);
+        Assert.All(_store.Messages, m => Assert.Equal(threadId, m.ThreadId));
+        var offered = Assert.Single(_classifier.ThreadContexts[1]);
+        Assert.Equal("Labels print off-center.", offered.Summary);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_NoCountLimit_EveryOpenIssueIsOfferedToTheAi()
+    {
+        for (var i = 1; i <= 12; i++)
+        {
+            _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Low, "a", null, $"Topic {i}");
+            await _processor.ProcessAsync(Text(AcmeMember, $"subject number {i}"), CancellationToken.None);
+        }
+
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Low, "a", null, "Topic 13");
+        await _processor.ProcessAsync(Text(AcmeMember, "another"), CancellationToken.None);
+
+        Assert.Equal(12, _classifier.ThreadContexts.Last().Count);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_NewIssueKeepsTheAiSummary_AndAFollowUpReplacesIt()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "Login problem", "User cannot log in.");
+        await _processor.ProcessAsync(Text(AcmeMember, "I cannot log in"), CancellationToken.None);
+        var thread = _store.Threads.Single();
+        Assert.Equal("User cannot log in.", thread.Summary);
+
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", thread.Id, null, "User cannot log in even after a password reset.");
+        await _processor.ProcessAsync(Text(AcmeMember, "reset did not help"), CancellationToken.None);
+
+        Assert.Equal("User cannot log in even after a password reset.", thread.Summary);
+        Assert.Equal("Login problem", thread.Title); // the title of a continued issue never changes
+    }
+
+    [Fact]
+    public async Task ProcessAsync_AFollowUpWithoutASummary_KeepsTheOldSummary()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", null, "T", "Old summary.");
+        await _processor.ProcessAsync(Text(AcmeMember, "one"), CancellationToken.None);
+        var thread = _store.Threads.Single();
+
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Medium, "a", thread.Id, null, null);
+        await _processor.ProcessAsync(Text(AcmeMember, "two"), CancellationToken.None);
+
+        Assert.Equal("Old summary.", thread.Summary);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_TheAiSeesMessageCountAndHighestPriorityOfEachIssue()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Critical, "a", null, "Outage");
+        await _processor.ProcessAsync(Text(AcmeMember, "system down"), CancellationToken.None);
+        var threadId = _store.Threads.Single().Id;
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Low, "a", threadId, null);
+        await _processor.ProcessAsync(Text(AcmeMember, "any news?"), CancellationToken.None);
+
+        await _processor.ProcessAsync(Text(AcmeMember, "hello again"), CancellationToken.None);
+
+        var offered = Assert.Single(_classifier.ThreadContexts[2]);
+        Assert.Equal(2, offered.MessageCount);
+        Assert.Equal(GroupPriority.Critical, offered.HighestPriority);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_OnlyTheNewestFewMessagesOfAnIssueAreWrittenOut_TheSummaryCoversTheRest()
+    {
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Low, "a", null, "Long talk", "summary");
+        await _processor.ProcessAsync(Text(AcmeMember, "m1"), CancellationToken.None);
+        var threadId = _store.Threads.Single().Id;
+        _classifier.Result = PriorityClassificationResult.Success(GroupPriority.Low, "a", threadId, null, "summary");
+        for (var i = 2; i <= 6; i++)
+            await _processor.ProcessAsync(Text(AcmeMember, $"m{i}"), CancellationToken.None);
+
+        await _processor.ProcessAsync(Text(AcmeMember, "m7"), CancellationToken.None);
+
+        var offered = Assert.Single(_classifier.ThreadContexts.Last());
+        Assert.Equal(6, offered.MessageCount);
+        Assert.Equal(new[] { "m4", "m5", "m6" }, offered.Messages.Select(m => m.Text)); // Threads:MessagesPerThread = 3
     }
 
     [Fact]
@@ -772,8 +867,10 @@ public class CustomerMessageProcessorTests
 
     private sealed class ThrowingThreadRepository : SiloSupport.Application.Interfaces.ISupportThreadRepository
     {
-        public Task<IReadOnlyList<ThreadContextDto>> GetOpenContextAsync(int customerId, DateTime sinceUtc, int maxThreads, int messagesPerThread, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<ThreadContextDto>> GetOpenContextAsync(int customerId, int recentMessagesPerThread, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("db down");
+
+        public Task UpdateSummaryAsync(int threadId, string summary, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<SupportThread>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }

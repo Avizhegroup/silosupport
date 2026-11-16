@@ -246,6 +246,7 @@ public sealed class FakeGroupedMessageRepository : ICustomerGroupedMessageReposi
                 Id = _store.Threads.Count + 1,
                 CustomerId = message.Thread.CustomerId,
                 Title = message.Thread.Title,
+                Summary = message.Thread.Summary,
                 CreatedAtUtc = message.Thread.CreatedAtUtc,
                 LastActivityUtc = message.Thread.LastActivityUtc
             };
@@ -296,33 +297,43 @@ public sealed class FakeGroupedMessageRepository : ICustomerGroupedMessageReposi
     public Task<AttachmentContentDto?> GetAttachmentAsync(int attachmentId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
-/// <summary>In-memory thread repository mirroring the rules of the EF implementation (open = unresolved message and recent activity).</summary>
+/// <summary>In-memory thread repository mirroring the EF implementation: every open thread (unresolved message), no age or count limit.</summary>
 public sealed class FakeThreadRepository : ISupportThreadRepository
 {
     private readonly FakeStore _store;
 
     public FakeThreadRepository(FakeStore store) => _store = store;
 
-    public Task<IReadOnlyList<ThreadContextDto>> GetOpenContextAsync(int customerId, DateTime sinceUtc, int maxThreads, int messagesPerThread, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<ThreadContextDto>> GetOpenContextAsync(int customerId, int recentMessagesPerThread, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<ThreadContextDto> result = _store.Threads
-            .Where(t => t.CustomerId == customerId && t.LastActivityUtc >= sinceUtc
-                        && _store.Messages.Any(m => m.ThreadId == t.Id && !m.IsResolved))
-            .OrderByDescending(t => t.LastActivityUtc)
-            .Take(maxThreads)
-            .Select(t => new ThreadContextDto(
-                t.Id,
-                t.Title,
-                t.LastActivityUtc,
-                _store.Messages
-                    .Where(m => m.ThreadId == t.Id && !string.IsNullOrWhiteSpace(m.OriginalText))
-                    .OrderByDescending(m => m.CreatedAtUtc).ThenByDescending(m => m.Id)
-                    .Take(messagesPerThread)
-                    .OrderBy(m => m.CreatedAtUtc).ThenBy(m => m.Id)
-                    .Select(m => new ThreadContextMessageDto(m.OriginalText!, _store.Groups.First(g => g.Id == m.GroupId).Priority, m.CreatedAtUtc))
-                    .ToList()))
+            .Where(t => t.CustomerId == customerId && _store.Messages.Any(m => m.ThreadId == t.Id && !m.IsResolved))
+            .OrderByDescending(t => t.LastActivityUtc).ThenByDescending(t => t.Id)
+            .Select(t =>
+            {
+                var own = _store.Messages.Where(m => m.ThreadId == t.Id).ToList();
+                return new ThreadContextDto(
+                    t.Id,
+                    t.Title,
+                    t.Summary,
+                    t.LastActivityUtc,
+                    own.Count,
+                    own.Max(m => _store.Groups.First(g => g.Id == m.GroupId).Priority),
+                    own.Where(m => !string.IsNullOrWhiteSpace(m.OriginalText))
+                        .OrderByDescending(m => m.CreatedAtUtc).ThenByDescending(m => m.Id)
+                        .Take(recentMessagesPerThread)
+                        .OrderBy(m => m.CreatedAtUtc).ThenBy(m => m.Id)
+                        .Select(m => new ThreadContextMessageDto(m.OriginalText!, _store.Groups.First(g => g.Id == m.GroupId).Priority, m.CreatedAtUtc))
+                        .ToList());
+            })
             .ToList();
         return Task.FromResult(result);
+    }
+
+    public Task UpdateSummaryAsync(int threadId, string summary, CancellationToken cancellationToken = default)
+    {
+        _store.Threads.First(t => t.Id == threadId).Summary = summary;
+        return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<SupportThread>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();

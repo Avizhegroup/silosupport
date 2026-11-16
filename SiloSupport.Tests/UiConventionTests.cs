@@ -145,6 +145,33 @@ public class UiConventionTests
     }
 
     [Fact]
+    public void ConversationsPage_IsBuiltAroundThreads_WithSummaryConversationFilterAndTheOldGroupView()
+    {
+        var page = Read("Components", "Pages", "Admin", "Conversations", "CustomerConversations.razor");
+
+        Assert.Contains("thread.Summary", page);          // the rolling summary of each issue
+        Assert.Contains("<Conversation Messages=", page); // chat-style conversation under each thread
+        Assert.Contains("VisibleThreads", page);          // status filter + search
+        Assert.Contains("<TelerikTextBox", page);
+        Assert.Contains("<TelerikButton", page);
+        Assert.Contains("پیام‌های قدیمی", page);           // messages from before threads existed stay visible
+        Assert.Contains("بر اساس گروه اولویت", page);     // the per-group view with per-message resolve is kept
+        Assert.Contains("SetResolvedAsync", page);
+        Assert.DoesNotContain("OpenWindowHours", page);
+    }
+
+    [Fact]
+    public void ConversationComponent_ShowsTheCustomersTextTheFileAndTheForwardedText()
+    {
+        var view = Read("Components", "Shared", "Conversation.razor");
+
+        Assert.Contains("OriginalText", view);
+        Assert.Contains("<AttachmentView", view);
+        Assert.Contains("<PriorityChip", view);
+        Assert.Contains("PersianDateFormatter", view);
+    }
+
+    [Fact]
     public void AttachmentView_UsesTheSecuredEndpointAndOnlyPlaysSafeTypes()
     {
         var view = Read("Components", "Shared", "AttachmentView.razor");
@@ -178,6 +205,8 @@ public class UiConventionTests
         Assert.Contains(".thread-timeline", css);
         Assert.Contains(".attachment-image", css);
         Assert.Contains(".attachment-video", css);
+        Assert.Contains(".chat-bubble", css);
+        Assert.Contains(".thread-summary", css);
     }
 
     [Fact]

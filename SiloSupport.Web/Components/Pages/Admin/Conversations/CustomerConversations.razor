@@ -10,7 +10,7 @@
 <div class="page-header">
     <div>
         <h1>گفتگوهای مشتریان</h1>
-        <p class="page-sub">پیام‌های ارسال‌شده به گروه‌های اولویت هر مشتری و وضعیت رسیدگی به آن‌ها</p>
+        <p class="page-sub">هر مشتری چند «موضوع» دارد؛ پیام‌هایی که به یک مسئله مربوط‌اند زیر همان موضوع جمع می‌شوند و تا زمانی که حل‌شده نشوند باز می‌مانند</p>
     </div>
 </div>
 
@@ -28,7 +28,7 @@
     <div class="empty-state">
         <TelerikSvgIcon Icon="@SvgIcon.Comment" />
         <strong>یک مشتری انتخاب کنید</strong>
-        <span>پیام‌های ارسال‌شده به گروه‌های اولویت او در اینجا نمایش داده می‌شود.</span>
+        <span>موضوع‌ها و گفتگوی هر موضوع در اینجا نمایش داده می‌شود.</span>
     </div>
 }
 else if (_loading)
@@ -43,78 +43,118 @@ else
 {
     <MissingPriorityAlert Missing="_conversation.MissingPriorities" />
 
-    @if (_conversation.Groups.Count == 0)
-    {
-        <div class="banner banner-info">این مشتری هنوز گروه اولویتی ندارد.</div>
-    }
+    <div class="stat-grid">
+        <div class="stat-tile stat-warn">
+            <span class="stat-icon"><TelerikSvgIcon Icon="@SvgIcon.ExclamationCircle" /></span>
+            <span class="stat-text">
+                <span class="stat-label">موضوعات باز</span>
+                <span class="stat-value">@OpenThreadCount</span>
+            </span>
+        </div>
+        <div class="stat-tile stat-ok">
+            <span class="stat-icon"><TelerikSvgIcon Icon="@SvgIcon.CheckCircle" /></span>
+            <span class="stat-text">
+                <span class="stat-label">موضوعات حل‌شده</span>
+                <span class="stat-value">@(_conversation.Threads.Count - OpenThreadCount)</span>
+            </span>
+        </div>
+        <div class="stat-tile stat-info">
+            <span class="stat-icon"><TelerikSvgIcon Icon="@SvgIcon.Comment" /></span>
+            <span class="stat-text">
+                <span class="stat-label">کل پیام‌ها</span>
+                <span class="stat-value">@TotalMessageCount</span>
+            </span>
+        </div>
+    </div>
 
     <TelerikTabStrip>
-        <TabStripTab Title="موضوعات (پیگیری مکالمه‌ها)">
+        <TabStripTab Title="موضوعات">
+            <div class="thread-toolbar">
+                <div class="form-row">
+                    <label>وضعیت</label>
+                    <TelerikDropDownList Data="_statusItems" TextField="@nameof(FilterItem.Text)" ValueField="@nameof(FilterItem.Value)"
+                                         @bind-Value="_status" Width="180px" />
+                </div>
+                <div class="form-row thread-search">
+                    <label>جستجو</label>
+                    <TelerikTextBox @bind-Value="_search" Placeholder="عنوان، خلاصه یا متن پیام…" Width="320px" />
+                </div>
+            </div>
+
             @if (_conversation.Threads.Count == 0 && _conversation.LegacyMessages.Count == 0)
             {
-                <p class="muted">هنوز موضوعی ثبت نشده است.</p>
+                <div class="empty-state">
+                    <TelerikSvgIcon Icon="@SvgIcon.Comment" />
+                    <strong>هنوز موضوعی ثبت نشده است</strong>
+                    <span>با دریافت اولین پیام مشتری، موضوع آن ساخته می‌شود.</span>
+                </div>
+            }
+            else if (!VisibleThreads.Any())
+            {
+                <p class="muted">موضوعی با این فیلتر یافت نشد.</p>
             }
 
-            @foreach (var thread in _conversation.Threads)
+            @foreach (var thread in VisibleThreads)
             {
+                var expanded = _expanded.Contains(thread.Id);
                 <div class="panel thread @(thread.IsOpen ? "thread-open" : "thread-closed")">
-                    <div class="panel-head">
-                        <div>
-                            <h2>@thread.Title <PriorityChip Priority="thread.HighestPriority" /></h2>
+                    <div class="panel-head thread-head">
+                        <div class="thread-title">
+                            <h2>@thread.Title</h2>
+                            <div class="thread-badges">
+                                <PriorityChip Priority="thread.HighestPriority" />
+                                <span class="status-badge @(thread.IsOpen ? "status-open" : "status-done")">@(thread.IsOpen ? "باز" : "حل‌شده")</span>
+                                <span class="muted">@thread.Messages.Count پیام</span>
+                            </div>
                             <span class="muted">
-                                @thread.Messages.Count پیام · شروع: @PersianDateFormatter.FormatUtc(thread.CreatedAtUtc) · آخرین فعالیت: @PersianDateFormatter.FormatUtc(thread.LastActivityUtc)
+                                شروع: @PersianDateFormatter.FormatUtc(thread.CreatedAtUtc) · آخرین فعالیت: @PersianDateFormatter.FormatUtc(thread.LastActivityUtc)
                             </span>
                         </div>
                         <TelerikSwitch Value="!thread.IsOpen" ValueChanged="@((bool value) => SetThreadResolvedAsync(thread, value))"
                                        OnLabel="حل‌شده" OffLabel="در حال رسیدگی" Width="170px" />
                     </div>
 
-                    <ol class="thread-timeline">
-                        @foreach (var m in thread.Messages)
-                        {
-                            <li class="thread-message">
-                                <div class="thread-message-meta">
-                                    <span>@PersianDateFormatter.FormatUtc(m.CreatedAtUtc)</span>
-                                    <PriorityChip Priority="m.Priority" />
-                                    <span class="muted">@m.GroupName</span>
-                                    @if (m.IsResolved)
-                                    {
-                                        <span class="muted">· حل‌شده</span>
-                                    }
-                                </div>
-                                <div class="message-text">@m.Message</div>
-                                <AttachmentView Attachment="m.Attachment" />
-                            </li>
-                        }
-                    </ol>
+                    <div class="thread-summary">
+                        <strong>خلاصه موضوع</strong>
+                        <p>@(string.IsNullOrWhiteSpace(thread.Summary) ? FallbackSummary(thread) : thread.Summary)</p>
+                    </div>
+
+                    <div class="thread-actions">
+                        <TelerikButton OnClick="@(() => Toggle(thread.Id))">@(expanded ? "بستن گفتگو" : "نمایش گفتگو")</TelerikButton>
+                    </div>
+
+                    @if (expanded)
+                    {
+                        <Conversation Messages="thread.Messages" />
+                    }
                 </div>
             }
 
             @if (_conversation.LegacyMessages.Count > 0)
             {
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2>پیام‌های قدیمی (بدون موضوع)</h2>
-                        <span class="muted">@_conversation.LegacyMessages.Count پیام</span>
+                <div class="panel thread thread-closed">
+                    <div class="panel-head thread-head">
+                        <div class="thread-title">
+                            <h2>پیام‌های قدیمی (بدون موضوع)</h2>
+                            <span class="muted">@_conversation.LegacyMessages.Count پیام که پیش از ساخت موضوع‌ها ثبت شده‌اند</span>
+                        </div>
+                        <TelerikButton OnClick="@(() => _legacyExpanded = !_legacyExpanded)">@(_legacyExpanded ? "بستن" : "نمایش")</TelerikButton>
                     </div>
-                    <ol class="thread-timeline">
-                        @foreach (var m in _conversation.LegacyMessages)
-                        {
-                            <li class="thread-message">
-                                <div class="thread-message-meta">
-                                    <span>@PersianDateFormatter.FormatUtc(m.CreatedAtUtc)</span>
-                                    <PriorityChip Priority="m.Priority" />
-                                    <span class="muted">@m.GroupName</span>
-                                </div>
-                                <div class="message-text">@m.Message</div>
-                            </li>
-                        }
-                    </ol>
+
+                    @if (_legacyExpanded)
+                    {
+                        <Conversation Messages="_conversation.LegacyMessages" />
+                    }
                 </div>
             }
         </TabStripTab>
 
-        <TabStripTab Title="گروه‌های اولویت">
+        <TabStripTab Title="بر اساس گروه اولویت">
+            @if (_conversation.Groups.Count == 0)
+            {
+                <div class="banner banner-info">این مشتری هنوز گروه اولویتی ندارد.</div>
+            }
+
             @foreach (var group in _conversation.Groups)
             {
                 <div class="panel">
@@ -161,14 +201,38 @@ else
 }
 
 @code {
+    private sealed record FilterItem(string Value, string Text);
+
     [Parameter] public int? CustomerId { get; set; }
+
+    private static readonly IReadOnlyList<FilterItem> _statusItems = new[]
+    {
+        new FilterItem("all", "همه موضوعات"),
+        new FilterItem("open", "فقط باز"),
+        new FilterItem("resolved", "فقط حل‌شده")
+    };
 
     private IReadOnlyList<CustomerListItemDto> _customers = Array.Empty<CustomerListItemDto>();
     private CustomerConversationDto? _conversation;
+    private readonly HashSet<int> _expanded = new();
+    private bool _legacyExpanded;
     private bool _loading;
     private string? _error;
+    private string _status = "all";
+    private string? _search;
 
     private int _selectedId => CustomerId ?? 0;
+
+    private int OpenThreadCount => _conversation?.Threads.Count(t => t.IsOpen) ?? 0;
+
+    private int TotalMessageCount => _conversation is null
+        ? 0
+        : _conversation.Threads.Sum(t => t.Messages.Count) + _conversation.LegacyMessages.Count;
+
+    private IEnumerable<ThreadDto> VisibleThreads =>
+        (_conversation?.Threads ?? Array.Empty<ThreadDto>())
+            .Where(t => _status == "all" || (_status == "open") == t.IsOpen)
+            .Where(Matches);
 
     protected override async Task OnInitializedAsync() => _customers = await Customers.GetListAsync();
 
@@ -176,6 +240,8 @@ else
     {
         _conversation = null;
         _error = null;
+        _expanded.Clear();
+        _legacyExpanded = false;
         if (CustomerId is null)
             return;
 
@@ -184,6 +250,11 @@ else
         try
         {
             _conversation = await Conversations.GetAsync(CustomerId.Value);
+
+            // The most recently active open issue starts expanded so the page opens on what needs attention.
+            var first = _conversation?.Threads.FirstOrDefault(t => t.IsOpen);
+            if (first is not null)
+                _expanded.Add(first.Id);
         }
         finally
         {
@@ -194,6 +265,36 @@ else
     private void OnCustomerChanged(int customerId)
     {
         Navigation.NavigateTo(customerId == 0 ? "/admin/conversations" : $"/admin/conversations/{customerId}");
+    }
+
+    private void Toggle(int threadId)
+    {
+        if (!_expanded.Remove(threadId))
+            _expanded.Add(threadId);
+    }
+
+    private bool Matches(ThreadDto thread)
+    {
+        if (string.IsNullOrWhiteSpace(_search))
+            return true;
+
+        var term = _search.Trim();
+        return Contains(thread.Title, term)
+               || Contains(thread.Summary, term)
+               || thread.Messages.Any(m => Contains(m.OriginalText ?? m.Message, term));
+    }
+
+    private static bool Contains(string? text, string term) =>
+        text is not null && text.Contains(term, StringComparison.CurrentCultureIgnoreCase);
+
+    /// <summary>Issues created before summaries existed show the first customer text instead.</summary>
+    private static string FallbackSummary(ThreadDto thread)
+    {
+        var first = thread.Messages.Select(m => m.OriginalText).FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+        if (first is null)
+            return "خلاصه‌ای برای این موضوع ثبت نشده است.";
+
+        return first.Length <= 240 ? first : first.Substring(0, 239) + "…";
     }
 
     private async Task SetThreadResolvedAsync(ThreadDto thread, bool isResolved)

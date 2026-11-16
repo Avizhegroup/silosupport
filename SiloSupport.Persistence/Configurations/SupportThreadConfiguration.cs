@@ -12,6 +12,7 @@ public class SupportThreadConfiguration : IEntityTypeConfiguration<SupportThread
         builder.HasKey(t => t.Id);
 
         builder.Property(t => t.Title).IsRequired().HasMaxLength(200);
+        builder.Property(t => t.Summary).HasMaxLength(1000);
         builder.Property(t => t.CreatedAtUtc).IsRequired();
         builder.Property(t => t.LastActivityUtc).IsRequired();
 

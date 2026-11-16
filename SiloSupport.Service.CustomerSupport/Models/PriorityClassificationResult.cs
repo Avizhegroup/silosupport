@@ -5,13 +5,14 @@ namespace SiloSupport.Service.CustomerSupport.Models;
 /// <summary>Result of asking the AI API for a priority.</summary>
 public sealed class PriorityClassificationResult
 {
-    private PriorityClassificationResult(bool succeeded, GroupPriority priority, string? analysis, string? error, int? threadId, string? threadTitle)
+    private PriorityClassificationResult(bool succeeded, GroupPriority priority, string? analysis, string? error, int? threadId, string? threadTitle, string? threadSummary)
     {
         Succeeded = succeeded;
         Priority = priority;
         Analysis = analysis;
         Error = error;
         ThreadId = threadId;
+        ThreadSummary = threadSummary;
         ThreadTitle = threadTitle;
     }
 
@@ -30,14 +31,17 @@ public sealed class PriorityClassificationResult
     /// </summary>
     public int? ThreadId { get; }
 
+    /// <summary>The AI's up-to-date summary of the whole issue the message belongs to (including this message); null when it gave none.</summary>
+    public string? ThreadSummary { get; }
+
     /// <summary>A short title of the issue the message belongs to (used as the title of a new issue); null when the AI gave none.</summary>
     public string? ThreadTitle { get; }
 
-    public static PriorityClassificationResult Success(GroupPriority priority, string? analysis, int? threadId = null, string? threadTitle = null) =>
-        new(true, priority, analysis, null, threadId, threadTitle);
+    public static PriorityClassificationResult Success(GroupPriority priority, string? analysis, int? threadId = null, string? threadTitle = null, string? threadSummary = null) =>
+        new(true, priority, analysis, null, threadId, threadTitle, threadSummary);
 
     public static PriorityClassificationResult Failure(string error) =>
-        new(false, default, null, error, null, null);
+        new(false, default, null, error, null, null, null);
 }
 
 /// <summary>Everything needed to build the text forwarded to a priority group.</summary>

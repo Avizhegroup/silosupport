@@ -7,16 +7,18 @@ namespace SiloSupport.Application.Interfaces;
 public interface ISupportThreadRepository
 {
     /// <summary>
-    /// The customer's open issues for the AI: threads with an unresolved message and activity at or after
-    /// <paramref name="sinceUtc"/>, most recent first (at most <paramref name="maxThreads"/>), each with its newest
-    /// <paramref name="messagesPerThread"/> messages oldest first. Only messages with a recorded customer text are included.
+    /// <b>Every</b> open issue of the customer (at least one unresolved message), most recently active first - there is no
+    /// age or count limit, because an issue stays open until somebody resolves it and the customer may come back to it
+    /// at any time. Each issue carries its summary, message count, highest priority and its newest
+    /// <paramref name="recentMessagesPerThread"/> customer texts (oldest first).
     /// </summary>
     Task<IReadOnlyList<ThreadContextDto>> GetOpenContextAsync(
         int customerId,
-        DateTime sinceUtc,
-        int maxThreads,
-        int messagesPerThread,
+        int recentMessagesPerThread,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Replaces the summary of a thread (called after a follow-up message was added to it).</summary>
+    Task UpdateSummaryAsync(int threadId, string summary, CancellationToken cancellationToken = default);
 
     /// <summary>All threads of the customer (without messages), most recently active first.</summary>
     Task<IReadOnlyList<SupportThread>> GetByCustomerAsync(int customerId, CancellationToken cancellationToken = default);

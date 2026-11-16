@@ -60,20 +60,24 @@ public class ConversationService
             m.Message,
             m.CreatedAtUtc,
             m.IsResolved,
-            m.Attachment);
+            m.Attachment,
+            m.OriginalText);
 
         var threadRows = await _threads.GetByCustomerAsync(customerId, cancellationToken);
         var threadDtos = threadRows
             .Select(t => new ThreadDto(
                 t.Id,
                 t.Title,
+                t.Summary,
                 DateTime.SpecifyKind(t.CreatedAtUtc, DateTimeKind.Utc),
                 DateTime.SpecifyKind(t.LastActivityUtc, DateTimeKind.Utc),
                 messages.Where(m => m.ThreadId == t.Id)
                     .OrderBy(m => m.CreatedAtUtc).ThenBy(m => m.Id)
                     .Select(ToThreadMessage)
                     .ToList()))
-            .OrderByDescending(t => t.LastActivityUtc)
+            // Open issues first (they need attention), each block newest activity first.
+            .OrderByDescending(t => t.IsOpen)
+            .ThenByDescending(t => t.LastActivityUtc)
             .ThenByDescending(t => t.Id)
             .ToList();
 
