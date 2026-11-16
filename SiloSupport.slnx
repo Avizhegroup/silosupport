@@ -8,6 +8,7 @@
     <File Path="Docs/bale-docs.md" />
     <File Path="Docs/RAG-Chat-Guide.md" />
     <File Path="Docs/customer-support-routing.md" />
+    <File Path="Docs/support-instructions.md" />
   </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/Core/">
