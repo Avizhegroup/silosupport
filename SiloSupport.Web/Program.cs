@@ -9,7 +9,6 @@ using SiloSupport.Web.Components;
 using SiloSupport.Web.Localization;
 using SiloSupport.Web.Security;
 using Telerik.Blazor.Services;
-using SiloSupport.Web.Extensions;
 using SiloSupport.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,9 +37,7 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.AccessDeniedPath = "/Account/AccessDenied";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
-    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     o.ExpireTimeSpan = TimeSpan.FromDays(7);
 });
 
@@ -78,11 +75,7 @@ using (var scope = app.Services.CreateScope())
     await IdentitySeeder.SeedAsync(scope.ServiceProvider, app.Configuration, logger);
 }
 
-// 6. Middleware.
-if (!app.Environment.IsDevelopment())
-    app.UseHsts();
-
-app.UseHttpsRedirection();
+// 6. Middleware. Support HTTP-only deployments without HTTPS redirection or HSTS.
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -137,7 +130,12 @@ app.MapGet("/admin/attachments/{id:int}", async (int id, bool? download, HttpCon
         : Results.Bytes(file.Content, "application/octet-stream", AttachmentMime.DownloadName(file.Id, file.FileName, mime));
 }).RequireAuthorization(new AuthorizeAttribute { Roles = AppRoles.Administrator });
 
-app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode().Add(endpoint =>
+{
+    // The login page needs the bootstrap script, which is an endpoint rather than a wwwroot file.
+    if (endpoint is RouteEndpointBuilder { RoutePattern.RawText: "/_framework/blazor.web.js" })
+        endpoint.Metadata.Add(new AllowAnonymousAttribute());
+});
 
 app.Run();
 

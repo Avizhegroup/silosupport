@@ -8,21 +8,22 @@
 	<ItemGroup>
 		<PackageVersion Include="BuildBundlerMinifier2022" Version="2.9.11" />
 		<PackageVersion Include="BuildWebCompiler2022" Version="1.14.15" />
-		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0" />
-		<PackageVersion Include="Microsoft.Extensions.Options" Version="11.0.0" />
+		<!-- Keep hosting/logging integrations on .NET 9 to avoid incompatible DiagnosticSource runtime assets. -->
+		<PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="$(AspNetCoreVersion)" />
+		<PackageVersion Include="Microsoft.Extensions.Options" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="System.Text.Json" Version="10.0.3" />
 		<PackageVersion Include="Telerik.UI.for.Blazor" Version="9.0.0" />
 		<PackageVersion Include="Serilog" Version="4.4.0" />
-		<PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
-		<PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
-		<PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
+		<PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
+		<PackageVersion Include="Serilog.Extensions.Hosting" Version="9.0.0" />
+		<PackageVersion Include="Serilog.Extensions.Logging" Version="9.0.0" />
 		<PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
 		<PackageVersion Include="Serilog.Sinks.Debug" Version="3.0.0" />
 		<PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
 		<PackageVersion Include="Serilog.Sinks.Seq" Version="9.1.0" />
 		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="$(AspNetCoreVersion)" />
-		<PackageVersion Include="Microsoft.Extensions.Http" Version="11.0.0" />
+		<PackageVersion Include="Microsoft.Extensions.Http" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components" Version="$(AspNetCoreVersion)" />
 		<PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="$(AspNetCoreVersion)" />
@@ -40,11 +41,5 @@
 		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
 		<PackageVersion Include="xunit" Version="2.9.3" />
 		<PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
-    <PackageVersion Include="Serilog" Version="4.4.0" />
-    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
-    <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
-    <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
-    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
-    <PackageVersion Include="Serilog.Sinks.Seq" Version="9.1.0" />
 	</ItemGroup>
 </Project>

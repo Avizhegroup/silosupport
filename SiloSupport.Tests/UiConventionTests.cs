@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace SiloSupport.Tests;
 
@@ -195,6 +195,22 @@ public class UiConventionTests
         Assert.Contains("AttachmentMime.IsInlineSafe", program);
         Assert.Contains("nosniff", program);
         Assert.Contains("application/octet-stream", program);
+    }
+
+    [Fact]
+    public void WebHost_AllowsHttpAndHttps_WithSchemeAppropriateLoginCookies()
+    {
+        var program = Read("Program.cs");
+
+        Assert.Contains("o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;", program);
+        Assert.DoesNotContain("CookieSecurePolicy.Always", program);
+        Assert.DoesNotContain("UseHttpsRedirection(", program);
+        Assert.DoesNotContain("UseHsts(", program);
+        Assert.Contains("o.Cookie.HttpOnly = true;", program);
+        Assert.Contains("o.Cookie.SameSite = SameSiteMode.Lax;", program);
+        Assert.Contains("app.UseAuthentication();", program);
+        Assert.Contains("app.UseAuthorization();", program);
+        Assert.Contains("app.UseAntiforgery();", program);
     }
 
     [Fact]
