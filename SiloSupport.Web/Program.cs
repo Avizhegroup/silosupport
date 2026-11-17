@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SiloSupport.Application.Helpers;
 using SiloSupport.Application.Services;
@@ -9,6 +9,8 @@ using SiloSupport.Web.Components;
 using SiloSupport.Web.Localization;
 using SiloSupport.Web.Security;
 using Telerik.Blazor.Services;
+using SiloSupport.Web.Extensions;
+using SiloSupport.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +43,8 @@ builder.Services.ConfigureApplicationCookie(o =>
         : CookieSecurePolicy.Always;
     o.ExpireTimeSpan = TimeSpan.FromDays(7);
 });
+
+builder.Services.AddSiloSerilog(builder.Configuration);
 
 // 3. Application services used by the pages. Receiving Bale messages is NOT done here: that is the job of the
 //    SiloSupport.Service.CustomerSupport Windows service.

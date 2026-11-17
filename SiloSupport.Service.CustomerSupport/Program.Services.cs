@@ -1,9 +1,10 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SiloSupport.Application;
 using SiloSupport.Application.Interfaces;
 using SiloSupport.Application.Services;
+using SiloSupport.Infrastructure.Extensions;
 using SiloSupport.Infrastructure.Shared;
 using SiloSupport.Persistence;
 using SiloSupport.Service.CustomerSupport.Workers;
@@ -51,6 +52,8 @@ public static partial class Program
 
         // Receiving mechanism: long polling (getUpdates), as in SiloSupport.Service.CustomerChat.
         services.AddHostedService<BaleUpdatesWorker>();
+
+        services.AddSiloSerilogForWindowsServices(configuration);
 
         return services;
     }

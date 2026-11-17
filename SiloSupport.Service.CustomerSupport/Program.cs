@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Serilog;
 using SiloSupport.Service.CustomerSupport;
 
@@ -16,17 +16,8 @@ public static partial class Program
         var host = Host.CreateDefaultBuilder(args)
             .UseContentRoot(AppContext.BaseDirectory)
             .UseWindowsService(config => config.ServiceName = "Silo Customer Support Service")
-            .UseSerilog((context, services, logger) => logger
-                .MinimumLevel.Information()
-                .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
-                // The Bale bot token is part of the request URL; never log HttpClient request lines.
-                .MinimumLevel.Override("System.Net.Http.HttpClient", Serilog.Events.LogEventLevel.Warning)
-                .WriteTo.Console()
-                .WriteTo.File(
-                    Path.Combine(AppContext.BaseDirectory, "logs", "customer-support-.log"),
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 30))
             .ConfigureServices((context, services) => services.AddCustomerSupportBotServices(context.Configuration))
+            .UseSerilog()
             .Build();
 
         await host.RunAsync();
