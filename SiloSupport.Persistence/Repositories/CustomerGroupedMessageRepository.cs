@@ -40,7 +40,7 @@ public class CustomerGroupedMessageRepository : ICustomerGroupedMessageRepositor
             .Where(m => m.Group!.CustomerId == customerId)
             .OrderBy(m => m.CreatedAtUtc)
             .ThenBy(m => m.Id)
-            .Select(m => new { m.Id, m.GroupId, m.Message, m.CreatedAtUtc, m.IsResolved, m.ThreadId })
+            .Select(m => new { m.Id, m.GroupId, m.Message, m.OriginalText, m.CreatedAtUtc, m.IsResolved, m.ThreadId })
             .ToListAsync(cancellationToken);
 
         // Attachment metadata only: the file bytes are never loaded for the list (HasContent is computed by the database).
@@ -70,7 +70,8 @@ public class CustomerGroupedMessageRepository : ICustomerGroupedMessageRepositor
                 r.ThreadId,
                 attachments.TryGetValue(r.Id, out var a)
                     ? new AttachmentInfoDto(a.Id, a.Kind, a.FileName, a.MimeType, a.SizeBytes, a.HasContent)
-                    : null))
+                    : null,
+                r.OriginalText))
             .ToList();
     }
 

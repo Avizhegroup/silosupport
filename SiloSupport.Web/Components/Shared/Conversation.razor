@@ -1,0 +1,46 @@
+@* The messages of one issue as a conversation: the customer's text (or the forwarded text for older messages), the file
+   they sent, when it was sent and which priority group received it. *@
+<ol class="chat">
+    @foreach (var m in Messages)
+    {
+        <li class="chat-item">
+            <div class="chat-bubble @(m.IsResolved ? "chat-resolved" : null)">
+                <div class="chat-meta">
+                    <span>@PersianDateFormatter.FormatUtc(m.CreatedAtUtc)</span>
+                    <PriorityChip Priority="m.Priority" />
+                    @if (!string.IsNullOrEmpty(m.GroupName))
+                    {
+                        <span class="muted">ارسال‌شده به @m.GroupName</span>
+                    }
+                    @if (m.IsResolved)
+                    {
+                        <span class="status-badge status-done">حل‌شده</span>
+                    }
+                </div>
+
+                @if (m.OriginalText is not null)
+                {
+                    <div class="message-text">@m.OriginalText</div>
+                }
+                else if (m.Attachment is null)
+                {
+                    <div class="message-text">@m.Message</div>
+                }
+
+                <AttachmentView Attachment="m.Attachment" />
+
+                @if (m.OriginalText is not null || m.Attachment is not null)
+                {
+                    <details class="chat-forwarded">
+                        <summary>متن کامل ارسال‌شده به گروه پشتیبانی</summary>
+                        <div class="message-text">@m.Message</div>
+                    </details>
+                }
+            </div>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ThreadMessageDto> Messages { get; set; } = Array.Empty<ThreadMessageDto>();
+}

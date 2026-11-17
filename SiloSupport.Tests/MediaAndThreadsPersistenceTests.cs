@@ -20,7 +20,7 @@ public class MediaAndThreadsPersistenceTests : TestBase
         return (customer, low, critical);
     }
 
-    private Task AddWithThreadAsync(int groupId, int customerId, string title, string text, DateTimeOffset at, int? existingThreadId = null, MessageAttachment? attachment = null)
+    private Task AddWithThreadAsync(int groupId, int customerId, string title, string text, DateTimeOffset at, int? existingThreadId = null, MessageAttachment? attachment = null, string? summary = null)
     {
         var message = new CustomerGroupedMessage
         {
@@ -30,7 +30,7 @@ public class MediaAndThreadsPersistenceTests : TestBase
             CreatedAtUtc = at.UtcDateTime,
             ThreadId = existingThreadId,
             Thread = existingThreadId is null
-                ? new SupportThread { CustomerId = customerId, Title = title, CreatedAtUtc = at.UtcDateTime, LastActivityUtc = at.UtcDateTime }
+                ? new SupportThread { CustomerId = customerId, Title = title, Summary = summary, CreatedAtUtc = at.UtcDateTime, LastActivityUtc = at.UtcDateTime }
                 : null,
             Attachment = attachment
         };
@@ -67,44 +67,80 @@ public class MediaAndThreadsPersistenceTests : TestBase
     }
 
     [Fact]
-    public async Task OpenContext_ReturnsOnlyRecentOpenThreadsOfThatCustomer_WithTheLatestMessages()
+    public async Task OpenContext_ReturnsEveryOpenIssueOfThatCustomer_HoweverOld_WithSummaryCountsAndTheLatestMessages()
     {
-        var (acme, acmeLow, _) = await SetupAsync("Acme");
+        var (acme, acmeLow, acmeCritical) = await SetupAsync("Acme");
         var (beta, betaLow, _) = await SetupAsync("Beta");
         var now = Clock.GetUtcNow();
 
-        await AddWithThreadAsync(acmeLow.Id, acme.Id, "Open", "m1", now.AddMinutes(-50));
+        await AddWithThreadAsync(acmeLow.Id, acme.Id, "Open", "m1", now.AddMinutes(-50), summary: "Open issue summary");
         var openId = (await Db.SupportThreads.AsNoTracking().SingleAsync(t => t.Title == "Open")).Id;
         await AddWithThreadAsync(acmeLow.Id, acme.Id, "x", "m2", now.AddMinutes(-40), existingThreadId: openId);
-        await AddWithThreadAsync(acmeLow.Id, acme.Id, "x", "m3", now.AddMinutes(-30), existingThreadId: openId);
+        await AddWithThreadAsync(acmeCritical.Id, acme.Id, "x", "m3", now.AddMinutes(-30), existingThreadId: openId);
 
-        await AddWithThreadAsync(acmeLow.Id, acme.Id, "Stale", "old", now.AddHours(-48));
+        await AddWithThreadAsync(acmeLow.Id, acme.Id, "Months old", "old", now.AddDays(-90)); // no age limit
         await AddWithThreadAsync(acmeLow.Id, acme.Id, "Resolved", "done", now.AddMinutes(-20));
         var resolvedId = (await Db.SupportThreads.AsNoTracking().SingleAsync(t => t.Title == "Resolved")).Id;
         await Get<ICustomerGroupedMessageRepository>().SetThreadResolvedAsync(acme.Id, resolvedId, true);
         await AddWithThreadAsync(betaLow.Id, beta.Id, "Other customer", "secret", now.AddMinutes(-5));
 
-        var context = await Get<ISupportThreadRepository>().GetOpenContextAsync(acme.Id, now.AddHours(-24).UtcDateTime, 5, 2);
+        var context = await Get<ISupportThreadRepository>().GetOpenContextAsync(acme.Id, 2);
 
-        var thread = Assert.Single(context);
-        Assert.Equal("Open", thread.Title);
-        Assert.Equal(new[] { "m2", "m3" }, thread.Messages.Select(m => m.Text)); // the 2 latest, oldest first
-        Assert.All(thread.Messages, m => Assert.Equal(GroupPriority.Low, m.Priority));
-        Assert.Equal(DateTimeKind.Utc, thread.LastActivityUtc.Kind);
+        Assert.Equal(new[] { "Open", "Months old" }, context.Select(t => t.Title)); // newest activity first; resolved and other customers excluded
+        var open = context[0];
+        Assert.Equal("Open issue summary", open.Summary);
+        Assert.Equal(3, open.MessageCount);
+        Assert.Equal(GroupPriority.Critical, open.HighestPriority);
+        Assert.Equal(new[] { "m2", "m3" }, open.Messages.Select(m => m.Text)); // the 2 latest, oldest first
+        Assert.Equal(DateTimeKind.Utc, open.LastActivityUtc.Kind);
+        Assert.Equal(1, context[1].MessageCount);
     }
 
     [Fact]
-    public async Task OpenContext_RespectsTheThreadLimit_MostRecentFirst()
+    public async Task OpenContext_HasNoCountLimit()
     {
         var (customer, low, _) = await SetupAsync();
         var now = Clock.GetUtcNow();
-        for (var i = 1; i <= 4; i++)
-            await AddWithThreadAsync(low.Id, customer.Id, $"T{i}", $"text{i}", now.AddMinutes(-60 + i));
+        for (var i = 1; i <= 25; i++)
+            await AddWithThreadAsync(low.Id, customer.Id, $"T{i}", $"text{i}", now.AddMinutes(-100 + i));
 
-        var context = await Get<ISupportThreadRepository>().GetOpenContextAsync(customer.Id, now.AddHours(-24).UtcDateTime, 2, 4);
+        var context = await Get<ISupportThreadRepository>().GetOpenContextAsync(customer.Id, 3);
 
-        Assert.Equal(new[] { "T4", "T3" }, context.Select(t => t.Title));
-        Assert.Empty(await Get<ISupportThreadRepository>().GetOpenContextAsync(customer.Id, now.AddHours(-24).UtcDateTime, 0, 4));
+        Assert.Equal(25, context.Count);
+        Assert.Equal("T25", context[0].Title);
+        Assert.Equal("T1", context[^1].Title);
+        Assert.Empty((await Get<ISupportThreadRepository>().GetOpenContextAsync(customer.Id, 0)).First().Messages);
+    }
+
+    [Fact]
+    public async Task UpdateSummary_ReplacesTheSummaryOfThatThreadOnly()
+    {
+        var (customer, low, _) = await SetupAsync();
+        await AddWithThreadAsync(low.Id, customer.Id, "A", "a", Clock.GetUtcNow(), summary: "old");
+        await AddWithThreadAsync(low.Id, customer.Id, "B", "b", Clock.GetUtcNow(), summary: "untouched");
+        var a = (await Db.SupportThreads.AsNoTracking().SingleAsync(t => t.Title == "A")).Id;
+
+        await Get<ISupportThreadRepository>().UpdateSummaryAsync(a, "new summary");
+
+        var threads = await Db.SupportThreads.AsNoTracking().ToListAsync();
+        Assert.Equal("new summary", threads.Single(t => t.Title == "A").Summary);
+        Assert.Equal("untouched", threads.Single(t => t.Title == "B").Summary);
+    }
+
+    [Fact]
+    public async Task Conversation_ListsOpenThreadsFirst_WithTheirSummary()
+    {
+        var (customer, low, _) = await SetupAsync();
+        var now = Clock.GetUtcNow();
+        await AddWithThreadAsync(low.Id, customer.Id, "Older open", "a", now.AddHours(-5), summary: "open summary");
+        await AddWithThreadAsync(low.Id, customer.Id, "Newer resolved", "b", now.AddHours(-1));
+        var resolvedId = (await Db.SupportThreads.AsNoTracking().SingleAsync(t => t.Title == "Newer resolved")).Id;
+        await Get<ICustomerGroupedMessageRepository>().SetThreadResolvedAsync(customer.Id, resolvedId, true);
+
+        var conversation = await Get<ConversationService>().GetAsync(customer.Id);
+
+        Assert.Equal(new[] { "Older open", "Newer resolved" }, conversation!.Threads.Select(t => t.Title));
+        Assert.Equal("open summary", conversation.Threads[0].Summary);
     }
 
     [Fact]
@@ -275,6 +311,10 @@ public class MediaAndThreadsMigrationTests : IDisposable
         var tables = await db.Database.SqlQueryRaw<string>("SELECT name AS Value FROM sqlite_master WHERE type = 'table'").ToListAsync();
         Assert.Contains("SupportThreads", tables);
         Assert.Contains("MessageAttachments", tables);
+
+        // 20261117100000_SupportThreadSummary
+        var columns = await db.Database.SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('SupportThreads')").ToListAsync();
+        Assert.Contains("Summary", columns);
 
         var old = await db.CustomerGroupedMessages.AsNoTracking().SingleAsync();
         Assert.Equal("before", old.Message);

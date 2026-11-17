@@ -53,7 +53,9 @@ Updates arrive through **long polling** (`getUpdates`), the same mechanism `Silo
    still processed; (c) otherwise ignore (logged with a hint to register the member or set the customer's chat id).
 7. Load the customer's **open issues** (see "Issue threads" below) and ask the AI API for the priority **and** whether the
    message continues one of them (see below). Failure / invalid / unsupported priority → log, stop. No fallback.
-   A message that is only a file (no text) is never filed as Low: it is raised to Medium, because support cannot judge it.
+   A message that is only a file (no text) is described to the AI as `[The customer sent a photo without any text.]`; it
+   is judged by the rules in `Docs/support-instructions.md` (Low when it belongs to no open issue, otherwise the level of
+   the issue it follows).
 8. Resolve the destination group for **that customer and that priority**. Missing → log, stop.
 9. Format the text (customer, sender, priority, issue title / "continues issue", attachment kind and file name, original
    message, AI analysis when returned).
@@ -73,20 +75,34 @@ The bot never replies to the source group and never sends error or info messages
 ### Issue threads (follow-up messages)
 
 Customers often describe one problem over several messages, and often send unrelated messages one after another. Every
-recorded message therefore belongs to a `SupportThread` (one issue of one customer):
+recorded message therefore belongs to a `SupportThread` (one issue of one customer). **A thread is the main unit of the
+history**: a single message rarely means anything alone, the thread (title, summary, conversation) does.
 
-- Before classifying, the service loads the customer's **open** threads: at least one unresolved message and activity
-  within `Threads:OpenWindowHours` (default 24), at most `Threads:MaxThreadsInContext` (5), each with its last
-  `Threads:MessagesPerThread` (4) customer texts and the priority they got.
-- These are put in the prompt, and the model answers `{"priority", "analysis", "threadId", "title"}`: `threadId` is the
-  number of the open issue the new message **clearly** continues, or `null` for a new, unrelated issue.
-- Only an id that was actually offered (same customer) is accepted; anything else starts a new issue (logged).
-- A follow-up is still routed by **its own** priority, but the model is told to judge the whole issue with its history
-  (a short "still not working" after a critical outage stays Critical). The forwarded text says "ادامه موضوع: <title>"
+- **No time or count limit.** A thread is *open* while at least one of its messages is unresolved, and it stays open until
+  support resolves it. Before classifying, the service loads **every** open thread of the customer (however old, however
+  many) and gives them to the AI: id, title, **summary**, message count, highest priority, last activity and the newest
+  `Threads:MessagesPerThread` (3) customer texts. A customer who comes back to a subject weeks later therefore rejoins
+  the existing thread; with no related open thread a new one is created.
+- The only guard is the size of the request: if the description of all open issues exceeds `Threads:MaxContextCharacters`
+  (60000, far above normal) the issues with the oldest activity are left out and a warning is logged.
+- The model answers `{"priority","analysis","threadId","title","summary"}`: `threadId` is the open issue the new message
+  **clearly** continues (`null` = new issue), `title` names the issue, `summary` summarises the **whole** issue after
+  this message. The summary is stored on the thread (`SupportThreads.Summary`) and replaced with every follow-up; it is
+  what the AI reads about the older messages of the issue and what the panel shows at the top of the thread.
+- Only an id that was actually offered (same customer) is accepted; anything else starts a new issue (logged). The title
+  of an existing thread never changes.
+- A follow-up is still routed by **its own** priority, but the model judges the issue as a whole (a short "still not
+  working" after a critical outage stays Critical, "thanks, solved" is Low). The forwarded text says "ادامه موضوع: <title>"
   or "موضوع جدید: <title>".
 - Without an AI title the issue is titled with an excerpt of the first message. If the history cannot be loaded the
-  message is classified as a new issue.
+  message is classified as a new issue. A failed summary update is logged; the message itself is already recorded.
+- Resolving a thread in the panel resolves all its messages; a thread whose messages are all resolved is no longer offered
+  to the AI, so a later message about the same problem starts a new thread (the AI is told when the text says it recurred).
 - Messages recorded before this feature have no thread and are shown as "old messages" in the panel.
+
+The AI's behaviour is defined by **`Docs/support-instructions.md`** (the knowledge-base document of the Silo AI): role,
+the five-key answer, priorities, issue-tracking rules and examples. A test keeps it in step with the code (activation
+sentence, markers, and every example answer must be accepted by the real parser).
 
 ### How the priority is obtained
 
@@ -106,7 +122,7 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 - `Customer.BaleChatId`: optional `long`, unique when set (filtered index). The Bale chat (usually a group) where a customer's people write; it must not be one of the priority groups.
 - `CustomerMember.PhoneNumber` is required (at least 10 digits; Persian digits accepted). `CustomerMember.BaleId` is **optional** (people without a Bale user name). When set it is **text** (`nvarchar(64)`, trimmed). Administrators enter the Bale **user name** (`@ali`) or the numeric Bale user id. An incoming message is matched on the numeric `from.id` **or** the `from.username`, ignoring case and a leading `@` (`@Ali`, `ali` and `ALI` are the same). A numeric id match wins over a user name match. If the match spans members of more than one customer, the message is ignored with a warning. Bale messages never carry the sender's phone number, so it cannot be used for matching; members without a Bale ID are covered by the customer's chat id (flow step 6b).
 - `CustomerGroup.BaleId`: `long` (chat ids can exceed 32 bits, up to 52 significant bits).
-- `SupportThread` (`SupportThreads`): `CustomerId` (cascade), `Title`, `CreatedAtUtc`, `LastActivityUtc`. `CustomerGroupedMessages` gain `ThreadId` (nullable, `ON DELETE SET NULL`) and `OriginalText` (what the customer wrote; the forwarded `Message` also contains our header).
+- `SupportThread` (`SupportThreads`): `CustomerId` (cascade), `Title`, `Summary` (nullable, 1000 characters, the AI's rolling summary of the whole issue), `CreatedAtUtc`, `LastActivityUtc`. `CustomerGroupedMessages` gain `ThreadId` (nullable, `ON DELETE SET NULL`) and `OriginalText` (what the customer wrote; the forwarded `Message` also contains our header).
 - `MessageAttachment` (`MessageAttachments`): one per message (unique `GroupedMessageId`, cascade), `Kind` (text), `FileName`, `MimeType`, `SizeBytes`, `BaleFileId`, `BaleFileUniqueId`, `Content` (`varbinary(max)`, NULL when not downloaded). The list queries never load `Content`.
 - Unique: `SupportPersons.BaleUsername`; `Customers.BaleChatId` and `CustomerMembers.BaleId` (only non-NULL values); `CustomerGroups(CustomerId, Priority)`. `CustomerGroups.BaleId` is **not** unique any more (migration `Remove_Unique_BaleId`).
 - `CustomerGroups.Priority` is stored as text (`Low`/`Medium`/`Critical`).
@@ -126,7 +142,7 @@ behind `IMessagePriorityClassifier`); nothing else changes.
 | `/admin/customers/{id}/members/new`, `/{memberId}/edit` | member form (customer shown explicitly) |
 | `/admin/customers/{id}/groups/new`, `/{groupId}/edit` | destination group form |
 | `/admin/support-persons`, `/new`, `/{id}/edit` | support team: list (Id, name, phone, Bale user name), create, edit, delete |
-| `/admin/conversations[/{customerId}]` | one customer's conversation in two tabs: **issues** (threads with their messages, priority, files, resolve a whole issue) and **groups** (per priority group, resolve a message) |
+| `/admin/conversations[/{customerId}]` | one customer's history built around **threads**: tiles (open / resolved issues, messages), status filter and search, and per thread a card with title, priority, open/resolved state, **summary**, a resolve switch and an expandable chat-style conversation (the customer's text, files, time, receiving group, the full forwarded text on demand). Open threads come first; messages from before threads are listed under "old messages". A second tab keeps the per-priority-group view with a resolve switch per message |
 | `/admin/attachments/{id}` | the stored file (endpoint, Administrator only) |
 
 **Files in the panel**: images, video and audio of allow-listed types play inline (`<img>`, `<video>`, `<audio>`); every other
@@ -182,7 +198,7 @@ installed on the build machine (see Telerik's licensing documentation), otherwis
 All settings are plain values in the `appsettings.json` of each host (no user secrets, no environment variables).
 
 **Windows service** (`SiloSupport.Service.CustomerSupport/appsettings.json`; `Bale:MaxDownloadMegabytes` (20) and the
-`Threads` section (`OpenWindowHours` 24, `MaxThreadsInContext` 5, `MessagesPerThread` 4) are optional):
+`Threads` section (`MessagesPerThread` 3, `MaxContextCharacters` 60000) are optional – there is no limit on the age or number of open issues offered to the AI):
 
 ```json
 {
@@ -242,6 +258,8 @@ Migrations (all written by hand together with the model snapshot):
 6. `20261116100000_MessageAttachmentsAndThreads` – `SupportThreads`, `CustomerGroupedMessages.ThreadId` / `OriginalText`,
    `MessageAttachments`. Existing messages keep NULL thread and text. SQL Server adds the column and the foreign key;
    the SQLite branch (tests) adds the column with an inline `REFERENCES`. `Down` is SQL Server only.
+7. `20261117100000_SupportThreadSummary` – nullable `SupportThreads.Summary`. Existing threads keep NULL (the panel shows
+   the first customer text instead, and the AI sees the title and newest messages).
 
 They were written by hand because it was authored in an environment without the .NET SDK. Before relying on it, from the
 solution root run:
@@ -269,8 +287,8 @@ The Blazor Web project has no tests by decision.
 ## Known limitations
 
 - Only `message` updates are handled (not `edited_message`). Stickers, contacts and locations are ignored. Voice
-  messages are stored and forwarded, **not transcribed**, so the AI judges them only by their caption (a voice-only
-  message is filed as Medium at least).
+  messages are stored and forwarded, **not transcribed**, so the AI judges them only by their caption (a file with no
+  text and no open issue to belong to is `Low`, as `Docs/support-instructions.md` defines).
 - Files bigger than `Bale:MaxDownloadMegabytes` (Bale's download limit is 20 MB) are forwarded by `file_id` and recorded
   without bytes; the panel says so. Files are stored in the database, so watch its size; set a smaller limit if needed.
 - An album (several photos sent together, `media_group_id`) arrives as separate messages; the AI usually links them

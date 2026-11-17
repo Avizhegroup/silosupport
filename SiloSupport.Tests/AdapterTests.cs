@@ -362,10 +362,10 @@ public class SiloAiPriorityClassifierTests
     [Fact]
     public async Task ClassifyAsync_OffersOpenIssuesToTheAi_AndReturnsTheIssueItChose()
     {
-        _ai.Response = new RagChatResponse { ResponseText = "{\"priority\":\"Critical\",\"analysis\":\"a\",\"threadId\":7,\"title\":\"Server down\"}" };
+        _ai.Response = new RagChatResponse { ResponseText = "{\"priority\":\"Critical\",\"analysis\":\"a\",\"threadId\":7,\"title\":\"Server down\",\"summary\":\"Server down since 8am.\"}" };
         var open = new[]
         {
-            new ThreadContextDto(7, "Server down", new DateTime(2026, 11, 15, 8, 0, 0, DateTimeKind.Utc),
+            new ThreadContextDto(7, "Server down", "The server is down.", new DateTime(2026, 11, 15, 8, 0, 0, DateTimeKind.Utc), 1, GroupPriority.Critical,
                 new[] { new ThreadContextMessageDto("the server is down", GroupPriority.Critical, new DateTime(2026, 11, 15, 7, 0, 0, DateTimeKind.Utc)) })
         };
 
@@ -374,6 +374,7 @@ public class SiloAiPriorityClassifierTests
         Assert.Contains("[issue 7] Server down", Assert.Single(_ai.Calls).Message);
         Assert.Equal(7, result.ThreadId);
         Assert.Equal("Server down", result.ThreadTitle);
+        Assert.Equal("Server down since 8am.", result.ThreadSummary);
         Assert.Equal(GroupPriority.Critical, result.Priority);
     }
 

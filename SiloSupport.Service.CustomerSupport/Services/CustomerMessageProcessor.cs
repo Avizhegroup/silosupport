@@ -10,8 +10,8 @@ namespace SiloSupport.Service.CustomerSupport.Services;
 
 /// <summary>
 /// Processes one incoming Bale message: filters it (messages of support persons are never customer messages),
-/// resolves the customer, asks the AI API for a priority (together with the customer's recent open issues, so follow-ups
-/// are judged with their history and attached to the right issue), forwards the original text plus the AI analysis - and
+/// resolves the customer, asks the AI API for a priority (together with ALL of the customer's open issues, however old, so
+/// follow-ups are judged with their history and attached to the right issue, or start a new one), forwards the original text plus the AI analysis - and
 /// the photo, video, voice message, audio file or document the customer sent - to the customer's destination group for that
 /// priority, and records the forwarded text, the issue and the stored file. It never replies to the originating chat.
 /// </summary>
@@ -114,7 +114,7 @@ public class CustomerMessageProcessor
         var customerId = sender.CustomerId;
         var customerName = sender.CustomerName;
 
-        // 9. The customer's recent open issues, so a follow-up is judged with its history. A failure here only costs the
+        // 9. All of the customer's open issues (no age or count limit), so a follow-up is judged with its history. A failure here only costs the
         //    context; the message is still classified (as a new issue).
         var openThreads = await LoadOpenThreadsAsync(customerId, cancellationToken);
 
@@ -148,11 +148,6 @@ public class CustomerMessageProcessor
         }
 
         var priority = classification.Priority;
-        if (customerText is null && priority < GroupPriority.Medium)
-        {
-            // The content of a file sent without any text is unknown, so it is never filed as Low.
-            priority = GroupPriority.Medium;
-        }
 
         // 11. Destination group for exactly this customer and priority.
         var destination = await _groups.GetByCustomerAndPriorityAsync(customerId, priority, cancellationToken);
@@ -177,6 +172,8 @@ public class CustomerMessageProcessor
                 message.MessageId, classification.ThreadId);
         }
 
+        var summary = string.IsNullOrWhiteSpace(classification.ThreadSummary) ? null : Truncate(classification.ThreadSummary.Trim(), 1000);
+
         SupportThread? newThread = null;
         string threadTitle;
         if (continued is not null)
@@ -190,7 +187,7 @@ public class CustomerMessageProcessor
                     ? classification.ThreadTitle!
                     : customerText is not null ? Excerpt(customerText) : ForwardedMessageFormatter.Label(attachment!.Kind) + " (بدون متن)",
                 200);
-            newThread = new SupportThread { CustomerId = customerId, Title = threadTitle, CreatedAtUtc = now, LastActivityUtc = now };
+            newThread = new SupportThread { CustomerId = customerId, Title = threadTitle, Summary = summary, CreatedAtUtc = now, LastActivityUtc = now };
         }
 
         // 13. Format the original message and the actual AI analysis.
@@ -266,6 +263,23 @@ public class CustomerMessageProcessor
             return MessageProcessingOutcome.PersistenceFailed;
         }
 
+        // 17. A follow-up refreshes the summary of its issue (best effort: the message itself is already recorded).
+        if (continued is not null && summary is not null)
+        {
+            try
+            {
+                await _threads.UpdateSummaryAsync(continued.ThreadId, summary, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Updating the summary of issue {ThreadId} failed", continued.ThreadId);
+            }
+        }
+
         _logger.LogInformation(
             "Forwarded Bale message {MessageId} of customer {CustomerId} to group {GroupId} with priority {Priority} ({Issue}{File})",
             message.MessageId, customerId, destination.Id, priority,
@@ -276,14 +290,18 @@ public class CustomerMessageProcessor
 
     private async Task<IReadOnlyList<ThreadContextDto>> LoadOpenThreadsAsync(int customerId, CancellationToken cancellationToken)
     {
-        if (_threadingOptions.MaxThreadsInContext <= 0 || _threadingOptions.MessagesPerThread <= 0)
-            return Array.Empty<ThreadContextDto>();
-
         try
         {
-            var since = _clock.GetUtcNow().UtcDateTime.AddHours(-Math.Max(1, _threadingOptions.OpenWindowHours));
-            return await _threads.GetOpenContextAsync(
-                customerId, since, _threadingOptions.MaxThreadsInContext, _threadingOptions.MessagesPerThread, cancellationToken);
+            var all = await _threads.GetOpenContextAsync(customerId, Math.Max(0, _threadingOptions.MessagesPerThread), cancellationToken);
+            var fitted = PriorityClassificationPrompt.FitToBudget(all, _threadingOptions.MaxContextCharacters);
+            if (fitted.Count < all.Count)
+            {
+                _logger.LogWarning(
+                    "Customer {CustomerId} has {Total} open issues; only the {Kept} most recently active fit into Threads:MaxContextCharacters ({Budget}) and were offered to the AI",
+                    customerId, all.Count, fitted.Count, _threadingOptions.MaxContextCharacters);
+            }
+
+            return fitted;
         }
         catch (OperationCanceledException)
         {

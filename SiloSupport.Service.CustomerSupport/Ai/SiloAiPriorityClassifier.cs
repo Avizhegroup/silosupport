@@ -59,6 +59,6 @@ public class SiloAiPriorityClassifier : IMessagePriorityClassifier
         if (!AiPriorityResultParser.TryParse(response.ResponseText, out var parsed, out var error))
             return PriorityClassificationResult.Failure(error ?? "The AI response could not be parsed.");
 
-        return PriorityClassificationResult.Success(parsed!.Priority, parsed.Analysis, parsed.ThreadId, parsed.ThreadTitle);
+        return PriorityClassificationResult.Success(parsed!.Priority, parsed.Analysis, parsed.ThreadId, parsed.ThreadTitle, parsed.ThreadSummary);
     }
 }

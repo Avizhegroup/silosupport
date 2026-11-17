@@ -10,6 +10,7 @@ public sealed record AttachmentInfoDto(int Id, AttachmentKind Kind, string? File
 public sealed record AttachmentContentDto(int Id, AttachmentKind Kind, string? FileName, string? MimeType, byte[]? Content);
 
 /// <summary>A forwarded message as shown on the conversations page.</summary>
+/// <param name="OriginalText">What the customer wrote (without our header); null for a file without text and for messages recorded before this was kept.</param>
 /// <param name="ThreadId">The issue the message belongs to; null for messages recorded before threads existed.</param>
 public sealed record GroupedMessageDto(
     int Id,
@@ -18,7 +19,8 @@ public sealed record GroupedMessageDto(
     DateTime CreatedAtUtc,
     bool IsResolved,
     int? ThreadId = null,
-    AttachmentInfoDto? Attachment = null);
+    AttachmentInfoDto? Attachment = null,
+    string? OriginalText = null);
 
 /// <summary>A message inside a thread, with the group it was forwarded to.</summary>
 public sealed record ThreadMessageDto(
@@ -29,12 +31,14 @@ public sealed record ThreadMessageDto(
     string Message,
     DateTime CreatedAtUtc,
     bool IsResolved,
-    AttachmentInfoDto? Attachment);
+    AttachmentInfoDto? Attachment,
+    string? OriginalText = null);
 
 /// <summary>One issue of a customer: the messages that belong together (oldest first).</summary>
 public sealed record ThreadDto(
     int Id,
     string Title,
+    string? Summary,
     DateTime CreatedAtUtc,
     DateTime LastActivityUtc,
     IReadOnlyList<ThreadMessageDto> Messages)
@@ -46,11 +50,18 @@ public sealed record ThreadDto(
     public GroupPriority HighestPriority => Messages.Count == 0 ? GroupPriority.Low : Messages.Max(m => m.Priority);
 }
 
-/// <summary>A recent open issue of a customer, given to the AI so it can tell follow-ups from new issues.</summary>
+/// <summary>An open issue of a customer, given to the AI so it can tell follow-ups from new issues.</summary>
+/// <param name="Summary">The rolling summary of the whole issue (may be empty for issues created before summaries existed).</param>
+/// <param name="MessageCount">How many messages the issue has.</param>
+/// <param name="HighestPriority">The highest priority any message of the issue received.</param>
+/// <param name="Messages">Only the newest few customer messages (oldest first); the summary covers the rest.</param>
 public sealed record ThreadContextDto(
     int ThreadId,
     string Title,
+    string? Summary,
     DateTime LastActivityUtc,
+    int MessageCount,
+    GroupPriority HighestPriority,
     IReadOnlyList<ThreadContextMessageDto> Messages);
 
 /// <summary>One earlier message of an open issue (what the customer wrote and the priority it got).</summary>

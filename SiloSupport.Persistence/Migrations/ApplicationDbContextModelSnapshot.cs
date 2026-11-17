@@ -400,6 +400,10 @@ namespace SiloSupport.Persistence.Migrations
                     b.Property<DateTime>("LastActivityUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Summary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
